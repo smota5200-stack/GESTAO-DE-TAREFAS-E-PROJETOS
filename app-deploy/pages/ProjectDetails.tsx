@@ -50,12 +50,7 @@ const ProjectDetails: React.FC = () => {
                progress: pData.progress || 0, dueDate: pData.due_date || '',
                description: pData.description || '', driveLink: pData.drive_link || '',
                externalSystemLink: pData.external_system_link || '',
-               asanaProjectId: pData.asana_project_id || '',
-               figmaLink: pData.figma_link || '',
-               githubRepo: pData.github_repo || '',
-               notionLink: pData.notion_link || '',
-               zoomLink: pData.zoom_link || '',
-               teamsLink: pData.teams_link || ''
+               asanaProjectId: pData.asana_project_id || ''
             };
             setProject(proj);
 
@@ -78,7 +73,7 @@ const ProjectDetails: React.FC = () => {
    // Modals
    const [isDemandModalOpen, setIsDemandModalOpen] = useState(false);
    const [selectedPriceItem, setSelectedPriceItem] = useState<string>('');
-   const [newDemandForm, setNewDemandForm] = useState({ title: '', dueDate: '', cost: 0 });
+   const [newDemandForm, setNewDemandForm] = useState({ title: '', dueDate: '' });
 
    const [activeDemand, setActiveDemand] = useState<ProjectDemand | null>(null);
    const [isViewingDemand, setIsViewingDemand] = useState(false);
@@ -98,8 +93,6 @@ const ProjectDetails: React.FC = () => {
 
    // Estado para edição de prazo e serviço no detalhe da demanda
    const [isEditingDemandDate, setIsEditingDemandDate] = useState(false);
-   const [isEditingDemandCost, setIsEditingDemandCost] = useState(false);
-   const [demandCostInput, setDemandCostInput] = useState(0);
    const [demandDateInput, setDemandDateInput] = useState('');
    const [isEditingDemandService, setIsEditingDemandService] = useState(false);
    const [demandServiceInput, setDemandServiceInput] = useState('');
@@ -112,44 +105,14 @@ const ProjectDetails: React.FC = () => {
 
    // Edição do projeto
    const [isEditProjectOpen, setIsEditProjectOpen] = useState(false);
-   const [editProjectForm, setEditProjectForm] = useState({ 
-      title: '', 
-      clientId: '', 
-      dueDate: '', 
-      asanaProjectId: '',
-      figmaLink: '',
-      githubRepo: '',
-      notionLink: '',
-      zoomLink: '',
-      teamsLink: '',
-      driveLink: '',
-      dropboxLink: '',
-      meetLink: '',
-      adobeStudioLink: '',
-      gmailLink: '',
-      outlookLink: '',
-      category: ''
-   });
+   const [editProjectForm, setEditProjectForm] = useState({ title: '', clientId: '', dueDate: '', asanaProjectId: '' });
 
-   // Resumo financeiro do projeto deletado daqui pois já existe na linha 340+
-   
    // Seleção de demandas para exclusão
    const [selectedDemandIds, setSelectedDemandIds] = useState<Set<string>>(new Set());
 
    const [isImportingAsana, setIsImportingAsana] = useState(false);
    const [filterAssignee, setFilterAssignee] = useState<string>('all');
    const [newCommentInput, setNewCommentInput] = useState('');
-   const [activeTab, setActiveTab] = useState<'geral' | 'lista' | 'quadro' | 'cronograma' | 'painel' | 'calendario'>(() => {
-      const prefsStr = localStorage.getItem('freela_user_prefs');
-      if (prefsStr) {
-         try {
-            const prefs = JSON.parse(prefsStr);
-            if (prefs.defaultView) return prefs.defaultView;
-         } catch (e) {}
-      }
-      return 'geral';
-   });
-
    const { updateTask, getTaskComments, addTaskComment, getTaskDetails, updateCustomField } = useAsana();
    const { comments, fetchComments, addComment, loading: commentsLoading } = useDemandComments(activeDemand?.id, activeDemand?.asanaTaskId);
 
@@ -342,12 +305,9 @@ const ProjectDetails: React.FC = () => {
       );
    }
 
-   const totalProjectValue = demands.reduce((acc, curr) => acc + (curr.amount || 0), 0);
-   const totalPaid = demands.filter(d => d.paymentStatus === 'Pago').reduce((acc, curr) => acc + (curr.amount || 0), 0);
-   const totalPending = demands.filter(d => d.paymentStatus !== 'Pago').reduce((acc, curr) => acc + (curr.amount || 0), 0);
-   const totalCost = demands.reduce((acc, curr) => acc + (curr.cost || 0), 0);
-   const grossProfit = totalProjectValue - totalCost;
-   const profitMargin = totalProjectValue > 0 ? (grossProfit / totalProjectValue) * 100 : 0;
+   const totalProjectValue = demands.reduce((acc, curr) => acc + curr.amount, 0);
+   const totalPaid = demands.filter(d => d.paymentStatus === 'Pago').reduce((acc, curr) => acc + curr.amount, 0);
+   const totalPending = demands.filter(d => d.paymentStatus !== 'Pago').reduce((acc, curr) => acc + curr.amount, 0);
 
    const handleAdvanceProjectStatus = () => {
       const flow: typeof project.status[] = ['A Fazer', 'Entregue'];
@@ -393,7 +353,6 @@ const ProjectDetails: React.FC = () => {
          title: newDemandForm.title || priceItem.title,
          type: priceItem.type,
          amount: priceItem.price,
-         cost: newDemandForm.cost || 0,
          dueDate: newDemandForm.dueDate ? newDemandForm.dueDate.split('-').reverse().join('/') : 'Sem prazo',
          workStatus: 'A Fazer',
          paymentStatus: 'Pendente',
@@ -441,7 +400,6 @@ const ProjectDetails: React.FC = () => {
       setDemandPostingInput(demand.postingDate || '');
       setDemandFormatInput(demand.format || '');
       setDemandDeliveryInput(demand.deliveryDate || '');
-      setDemandCostInput(demand.cost || 0);
       setIsViewingDemand(true);
       fetchComments(demand.id, demand.asanaTaskId);
       
@@ -477,8 +435,7 @@ const ProjectDetails: React.FC = () => {
          priority: demandPriorityInput,
          postingDate: demandPostingInput,
          format: demandFormatInput,
-         deliveryDate: demandDeliveryInput,
-         cost: Number(demandCostInput) || 0
+         deliveryDate: demandDeliveryInput
       };
       await updateDemand(activeDemand.id, updates);
       
@@ -556,19 +513,7 @@ const ProjectDetails: React.FC = () => {
          title: project.title,
          clientId: project.clientId || '',
          dueDate: dateVal,
-         asanaProjectId: project.asanaProjectId || '',
-         figmaLink: project.figmaLink || '',
-         githubRepo: project.githubRepo || '',
-         notionLink: project.notionLink || '',
-         zoomLink: project.zoomLink || '',
-         teamsLink: project.teamsLink || '',
-         driveLink: project.driveLink || '',
-         dropboxLink: project.dropboxLink || '',
-         meetLink: project.meetLink || '',
-         adobeStudioLink: project.adobeStudioLink || '',
-         gmailLink: project.gmailLink || '',
-         outlookLink: project.outlookLink || '',
-         category: project.category || 'Design'
+         asanaProjectId: project.asanaProjectId || ''
       });
       setIsEditProjectOpen(true);
    };
@@ -603,19 +548,7 @@ const ProjectDetails: React.FC = () => {
          client_id: editProjectForm.clientId || null,
          client_name: selectedClient ? selectedClient.name : project.client,
          due_date: formattedDate,
-         asana_project_id: cleanAsanaId,
-         figma_link: editProjectForm.figmaLink,
-         github_repo: editProjectForm.githubRepo,
-         notion_link: editProjectForm.notionLink,
-         zoom_link: editProjectForm.zoomLink,
-         teams_link: editProjectForm.teamsLink,
-         drive_link: editProjectForm.driveLink,
-         dropbox_link: editProjectForm.dropboxLink,
-         meet_link: editProjectForm.meetLink,
-         adobe_studio_link: editProjectForm.adobeStudioLink,
-         gmail_link: editProjectForm.gmailLink,
-         outlook_link: editProjectForm.outlookLink,
-         category: editProjectForm.category
+         asana_project_id: cleanAsanaId
       }).eq('id', project.id);
 
       setProject({
@@ -624,19 +557,7 @@ const ProjectDetails: React.FC = () => {
          clientId: editProjectForm.clientId,
          client: selectedClient ? selectedClient.name : project.client,
          dueDate: formattedDate,
-         asanaProjectId: cleanAsanaId,
-         figmaLink: editProjectForm.figmaLink,
-         githubRepo: editProjectForm.githubRepo,
-         notionLink: editProjectForm.notionLink,
-         zoomLink: editProjectForm.zoomLink,
-         teamsLink: editProjectForm.teamsLink,
-         driveLink: editProjectForm.driveLink,
-         dropboxLink: editProjectForm.dropboxLink,
-         meetLink: editProjectForm.meetLink,
-         adobeStudioLink: editProjectForm.adobeStudioLink,
-         gmailLink: editProjectForm.gmailLink,
-         outlookLink: editProjectForm.outlookLink,
-         category: editProjectForm.category
+         asanaProjectId: cleanAsanaId
       });
       if (selectedClient) {
          setClient({ ...selectedClient });
@@ -682,11 +603,6 @@ const ProjectDetails: React.FC = () => {
                         <span className={`px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider border border-transparent transition-colors bg-slate-100 dark:bg-slate-800`}>
                            {project.status}
                         </span>
-                        {project.category && (
-                           <span className="px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider border border-primary/20 bg-primary/5 text-primary">
-                              {project.category}
-                           </span>
-                        )}
                      </div>
                      <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-2">{project.title}</h1>
                      <div className="flex flex-wrap items-center gap-4 text-slate-500 dark:text-slate-400">
@@ -720,35 +636,12 @@ const ProjectDetails: React.FC = () => {
                </div>
             </div>
 
-            {/* Tabs Interface Asana */}
-            <div className="border-b border-slate-200 dark:border-white/5 flex gap-6 px-8 overflow-x-auto custom-scrollbar bg-white dark:bg-surface-dark mt-4">
-               {[
-                  { id: 'geral', label: 'Visão geral' },
-                  { id: 'lista', label: 'Lista' },
-                  { id: 'quadro', label: 'Quadro' },
-                  { id: 'cronograma', label: 'Cronograma' },
-                  { id: 'painel', label: 'Painel' },
-                  { id: 'calendario', label: 'Calendário' }
-               ].map(tab => (
-                  <button
-                     key={tab.id}
-                     onClick={() => setActiveTab(tab.id as any)}
-                     className={`py-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id ? 'border-primary text-slate-900 dark:text-white' : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-                  >
-                     {tab.label}
-                  </button>
-               ))}
-               <button className="py-3 text-sm font-semibold text-slate-400 border-transparent hover:text-slate-600 border-b-2 ml-2 mb-1 flex items-center justify-center">
-                 <span className="material-symbols-outlined text-sm">add</span>
-               </button>
-            </div>
-
             <div className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-slate-100 dark:divide-white/5">
 
                {/* Main Content Column: Demandas */}
-               <div className="lg:col-span-8 flex flex-col h-[700px] overflow-y-auto custom-scrollbar">
+               <div className="lg:col-span-8 flex flex-col">
 
-                  <div className="p-8 bg-slate-50/30 dark:bg-black/20 min-h-full">
+                  <div className="p-8 bg-slate-50/30 dark:bg-black/20 flex-1">
                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                         <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
                            <span className="material-symbols-outlined text-lg text-primary">view_list</span> Demandas do Projeto
@@ -786,348 +679,150 @@ const ProjectDetails: React.FC = () => {
                            >
                               <span className="material-symbols-outlined text-sm">add</span> Adicionar Demanda
                            </button>
-                         </div>
-                      </div>
-                       {activeTab === 'geral' && (
-                        <div className="space-y-8">
-                            {/* Resumo Financeiro */}
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                               <div className="bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/5 rounded-2xl p-6 shadow-sm flex items-center gap-4">
-                                  <div className="size-12 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
-                                     <span className="material-symbols-outlined text-2xl">payments</span>
-                                  </div>
-                                  <div>
-                                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Orçado</p>
-                                     <h4 className="text-xl font-black text-slate-900 dark:text-white">
-                                        {new Intl.NumberFormat( 'pt-BR' , { style:  'currency' , currency:  'BRL'  }).format(totalProjectValue)}
-                                     </h4>
-                                  </div>
-                               </div>
-                               <div className="bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/5 rounded-2xl p-6 shadow-sm flex items-center gap-4">
-                                  <div className="size-12 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
-                                     <span className="material-symbols-outlined text-2xl">account_balance_wallet</span>
-                                  </div>
-                                  <div>
-                                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Recebido</p>
-                                     <h4 className="text-xl font-black text-slate-900 dark:text-white">
-                                        {new Intl.NumberFormat( 'pt-BR' , { style:  'currency' , currency:  'BRL'  }).format(totalPaid)}
-                                     </h4>
-                                  </div>
-                               </div>
-                               <div className="bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/5 rounded-2xl p-6 shadow-sm flex items-center gap-4">
-                                  <div className="size-12 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
-                                     <span className="material-symbols-outlined text-2xl">pending_actions</span>
-                                  </div>
-                                  <div>
-                                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">A Receber</p>
-                                     <h4 className="text-xl font-black text-slate-900 dark:text-white">
-                                        {new Intl.NumberFormat( 'pt-BR' , { style:  'currency' , currency:  'BRL'  }).format(totalPending)}
-                                     </h4>
-                                  </div>
-                               </div>
-                            </div>
-                           {/* Descrição e Status */}
-                           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                              <div className="md:col-span-2 bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/5 rounded-2xl p-6 shadow-sm">
-                                 <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-primary text-lg">description</span> Descrição do Projeto
-                                 </h4>
-                                 <div className="prose prose-sm dark:prose-invert text-slate-600 dark:text-slate-300">
-                                    {project.description ? (
-                                       <p className="whitespace-pre-wrap">{project.description}</p>
-                                    ) : (
-                                       <p className="italic text-slate-400">Nenhuma descrição definida para este projeto.</p>
-                                    )}
-                                 </div>
-                              </div>
-                              <div className="bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/5 rounded-2xl p-6 shadow-sm flex flex-col items-center justify-center text-center">
-                                 <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Status Geral</h4>
-                                 <span className={`px-4 py-1 rounded-full text-xs font-black uppercase tracking-wider ${project.status === 'Entregue' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-primary/10 text-primary'}`}>
-                                    {project.status || 'Em Andamento'}
-                                 </span>
-                                 <div className="mt-4 w-full">
-                                    <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase mb-1">
-                                       <span>Progresso</span>
-                                       <span>{project.progress}%</span>
-                                    </div>
-                                    <div className="w-full bg-slate-100 dark:bg-white/5 h-2 rounded-full overflow-hidden">
-                                       <div className="bg-primary h-full rounded-full transition-all duration-1000" style={{ width: `${project.progress}%` }}></div>
-                                    </div>
-                                 </div>
-                              </div>
-                           </div>
-
-                           {/* Ferramentas e Integrações */}
-                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                              {/* Figma Embed */}
-                              {project.figmaLink ? (
-                                 <div className="bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/5 rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col h-[450px]">
-                                    <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                       <span className="material-symbols-outlined text-[#F24E1E] text-lg">figma</span> Design (Figma)
-                                    </h4>
-                                    <iframe 
-                                       className="w-full flex-1 rounded-xl border border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-black/20"
-                                       src={`https://www.figma.com/embed?embed_host=share&url=${encodeURIComponent(project.figmaLink)}`}
-                                       allowFullScreen
-                                    ></iframe>
-                                 </div>
-                              ) : (
-                                 <div className="bg-slate-50/50 dark:bg-white/5 border border-dashed border-slate-200 dark:border-white/10 rounded-2xl p-8 flex flex-col items-center justify-center text-center group hover:border-primary/50 transition-colors cursor-pointer" onClick={openEditProject}>
-                                    <span className="material-symbols-outlined text-4xl text-slate-300 mb-3 group-hover:scale-110 transition-transform">brush</span>
-                                    <h5 className="font-bold text-slate-600 dark:text-slate-300">Nenhum Design Vinculado</h5>
-                                    <p className="text-xs text-slate-400 mt-1">Cole o link do Figma para visualizar o board aqui.</p>
-                                 </div>
-                              )}
-
-                              {/* GitHub Commits */}
-                              {project.githubRepo ? (
-                                 <div className="bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/5 rounded-2xl p-6 shadow-sm flex flex-col h-[450px]">
-                                    <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                       <span className="material-symbols-outlined text-[#333] dark:text-white text-lg">code</span> Últimos Commits (GitHub)
-                                    </h4>
-                                    <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3">
-                                       {[1,2,3,4,5].map(i => (
-                                          <div key={i} className="flex gap-3 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-white/5 transition-colors border border-transparent hover:border-slate-100 dark:hover:border-white/5">
-                                             <div className="size-8 rounded-full bg-slate-100 dark:bg-white/10 flex items-center justify-center shrink-0">
-                                                <span className="material-symbols-outlined text-sm text-slate-500">commit</span>
-                                             </div>
-                                             <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-bold text-slate-900 dark:text-white truncate">feat: implementação do componente de commits #{i}</p>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                   <span className="text-[10px] font-black text-primary uppercase">main</span>
-                                                   <span className="text-[10px] text-slate-400 italic">há {i} horas por @dev</span>
-                                                </div>
-                                             </div>
-                                          </div>
-                                       ))}
-                                    </div>
-                                    <button 
-                                       onClick={() => window.open(`https://github.com/${project.githubRepo}`, '_blank')}
-                                       className="mt-4 w-full py-2.5 rounded-xl text-xs font-bold bg-slate-900 text-white hover:bg-black transition-colors flex items-center justify-center gap-2"
-                                    >
-                                       <span className="material-symbols-outlined text-[16px]">open_in_new</span> Ver no Repositório
-                                    </button>
-                                 </div>
-                              ) : (
-                                 <div className="bg-slate-50/50 dark:bg-white/5 border border-dashed border-slate-200 dark:border-white/10 rounded-2xl p-8 flex flex-col items-center justify-center text-center group hover:border-primary/50 transition-colors cursor-pointer" onClick={openEditProject}>
-                                    <span className="material-symbols-outlined text-4xl text-slate-300 mb-3 group-hover:scale-110 transition-transform">terminal</span>
-                                    <h5 className="font-bold text-slate-600 dark:text-slate-300">Repositório não vinculado</h5>
-                                    <p className="text-xs text-slate-400 mt-1">Vincule um repositório GitHub para acompanhar o código.</p>
-                                 </div>
-                              )}
-                           </div>
-
-                           {/* Links Rápidos e Ações de Comunicação */}
-                            {/* Hub de Conexões e Ferramentas (11 Ferramentas) */}
-                            <div className="bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/5 rounded-2xl p-8 shadow-sm">
-                               <div className="flex items-center justify-between mb-6">
-                                  <h4 className="text-sm font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                                     <span className="material-symbols-outlined text-primary text-xl">hub</span> Hub de Conexões
-                                  </h4>
-                                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">11 Ferramentas Integradas</p>
-                               </div>
-
-                               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                                  {[
-                                     { id: 'gmail', label: 'Gmail', icon: 'mail', color: '#EA4335', link: project.gmailLink || (client?.email ? `https://mail.google.com/mail/?view=cm&fs=1&to=${client.email}&su=Acompanhamento: ${project.title}` : '') },
-                                     { id: 'outlook', label: 'Outlook', icon: 'alternate_email', color: '#0078D4', link: project.outlookLink || (client?.email ? `mailto:${client.email}?subject=Acompanhamento: ${project.title}` : '') },
-                                     { id: 'drive', label: 'GDrive', icon: 'add_to_drive', color: '#34A853', link: project.driveLink },
-                                     { id: 'dropbox', label: 'Dropbox', icon: 'cloud', color: '#0061FF', link: project.dropboxLink },
-                                     { id: 'notion', label: 'Notion', icon: 'notes', color: '#000000', link: project.notionLink },
-                                     { id: 'zoom', label: 'Zoom', icon: 'videocam', color: '#2D8CFF', link: project.zoomLink },
-                                     { id: 'teams', label: 'Teams', icon: 'groups', color: '#444791', link: project.teamsLink },
-                                     { id: 'meet', label: 'GMeet', icon: 'video_chat', color: '#00897B', link: project.meetLink },
-                                     { id: 'github', label: 'GitHub', icon: 'code', color: '#333333', link: project.githubRepo ? `https://github.com/${project.githubRepo}` : '' },
-                                     { id: 'figma', label: 'Figma', icon: 'brush', color: '#F24E1E', link: project.figmaLink },
-                                     { id: 'adobe', label: 'Adobe', icon: 'edit_square', color: '#FA0F00', link: project.adobeStudioLink },
-                                  ].map((tool) => (
-                                     <button
-                                        key={tool.id}
-                                        onClick={() => tool.link ? window.open(tool.link, '_blank') : openEditProject()}
-                                        className={`flex flex-col items-center justify-center p-4 rounded-2xl border transition-all group relative ${tool.link ? 'bg-slate-50 dark:bg-white/5 border-slate-100 dark:border-white/5 hover:border-primary/50 hover:shadow-md' : 'bg-transparent border-dashed border-slate-200 dark:border-white/10 opacity-60 hover:opacity-100'}`}
-                                     >
-                                        <div className="size-12 rounded-xl flex items-center justify-center mb-2 transition-transform group-hover:scale-110" style={{ backgroundColor: tool.link ? `${tool.color}15` : 'transparent' }}>
-                                           <span className="material-symbols-outlined text-2xl" style={{ color: tool.link ? tool.color : 'currentColor' }}>{tool.icon}</span>
-                                        </div>
-                                        <span className="text-[10px] font-black uppercase tracking-tighter text-slate-900 dark:text-white">{tool.label}</span>
-                                        {!tool.link && (
-                                           <div className="absolute top-2 right-2 size-4 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center">
-                                              <span className="material-symbols-outlined text-[10px]">add</span>
-                                           </div>
-                                        )}
-                                     </button>
-                                  ))}
-                               </div>
-                            </div>
                         </div>
-                     )}
+                     </div>
 
-                     {activeTab === 'lista' && (
-                        <div className="space-y-6">
-                           {['A Fazer', 'Em execução', 'Entregue'].map(statusGroup => {
-                              const groupDemands = demands.filter(d => 
-                                 (statusGroup === 'A Fazer' && d.workStatus === 'A Fazer') ||
-                                 (statusGroup === 'Em execução' && d.workStatus === 'Em Execução') ||
-                                 (statusGroup === 'Entregue' && d.workStatus === 'Entregue')
-                              );
-
-                              return (
-                                 <div key={statusGroup} className="space-y-2">
-                                    <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200 flex items-center justify-between">
-                                       <span>{statusGroup}</span>
-                                       <span className="text-xs font-normal text-slate-400">{groupDemands.length} tarefas</span>
-                                    </h4>
-                                    
-                                    <div className="bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/5 rounded-xl overflow-hidden shadow-sm">
-                                       {groupDemands.length > 0 ? (
-                                          <table className="w-full text-left">
-                                             <thead>
-                                                <tr className="border-b border-slate-100 dark:border-white/5 text-[10px] uppercase text-slate-500">
-                                                   <th className="px-4 py-2 font-medium w-1/2">Nome</th>
-                                                   <th className="px-4 py-2 font-medium">Responsável</th>
-                                                   <th className="px-4 py-2 font-medium">Data de Conclusão</th>
-                                                   <th className="px-4 py-2 font-medium">Prioridade</th>
-                                                   <th className="px-4 py-2 font-medium">Status</th>
-                                                </tr>
-                                             </thead>
-                                             <tbody className="divide-y divide-slate-50 dark:divide-white/5">
-                                                {groupDemands.map(d => (
-                                                   <tr key={d.id} onClick={() => openDemandDetails(d)} className="hover:bg-slate-50 dark:hover:bg-white/[0.02] cursor-pointer group">
-                                                      <td className="px-4 py-3">
-                                                         <div className="flex items-center gap-3">
-                                                            <div onClick={(e) => { e.stopPropagation(); toggleWorkStatusAvulso(d.id); }} className={`size-5 min-w-[20px] rounded-full border-2 flex items-center justify-center cursor-pointer ${d.workStatus === 'Entregue' ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300 dark:border-slate-600'}`}>
-                                                               {d.workStatus === 'Entregue' && <span className="material-symbols-outlined text-[12px] text-white">check</span>}
-                                                            </div>
-                                                            <span className="text-sm font-medium text-slate-900 dark:text-slate-200 group-hover:text-primary transition-colors">{d.title}</span>
-                                                         </div>
-                                                      </td>
-                                                      <td className="px-4 py-3 text-xs text-slate-600 dark:text-slate-400">
-                                                         {d.assigneeName ? (
-                                                            <div className="flex items-center gap-1.5 object-contain">
-                                                               <div className="size-5 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[10px] font-bold">
-                                                                  {d.assigneeName.charAt(0)}
-                                                               </div>
-                                                               {d.assigneeName}
-                                                            </div>
-                                                         ) : <span className="text-slate-300 border border-dashed border-slate-300 rounded-full px-2 py-0.5 text-[10px]">Atribuir</span>}
-                                                      </td>
-                                                      <td className="px-4 py-3 text-xs text-slate-600 dark:text-slate-400">
-                                                         {d.dueDate !== 'Sem prazo' ? formatDisplayDate(d.dueDate) : '-'}
-                                                      </td>
-                                                      <td className="px-4 py-3">
-                                                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                                            d.priority === 'High' || d.priority === 'Alta' ? 'bg-red-500/10 text-red-500' :
-                                                            d.priority === 'Medium' || d.priority === 'Média' ? 'bg-amber-500/10 text-amber-500' :
-                                                            d.priority === 'Low' || d.priority === 'Baixa' ? 'bg-blue-500/10 text-blue-500' :
-                                                            'bg-slate-100 dark:bg-white/5 text-slate-400'
-                                                         }`}>
-                                                            {d.priority || 'Baixa'}
-                                                         </span>
-                                                      </td>
-                                                      <td className="px-4 py-3">
-                                                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${d.workStatus === 'Entregue' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-blue-500/10 text-blue-500 border-blue-500/20'}`}>
-                                                            {d.workStatus === 'A Fazer' ? 'Em dia' : (d.workStatus === 'Entregue' ? 'Concluído' : 'A Fazer')}
-                                                         </span>
-                                                      </td>
-                                                   </tr>
-                                                ))}
-                                             </tbody>
-                                          </table>
-                                       ) : (
-                                          <div className="p-4 text-center text-slate-400 text-xs py-8">
-                                             Nenhuma tarefa nesta seção.
-                                          </div>
-                                       )}
-                                       <div className="p-2 border-t border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-black/10">
-                                          <button onClick={() => setIsDemandModalOpen(true)} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-primary font-medium px-2 py-1 rounded w-full">
-                                             <span className="material-symbols-outlined text-sm">add</span> Adicionar tarefa...
+                     <div className="bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/5 rounded-xl shadow-sm overflow-hidden">
+                        {demands.length > 0 ? (
+                           <div className="overflow-x-auto">
+                              <table className="w-full text-left">
+                                 <thead>
+                                    <tr className="bg-slate-50 dark:bg-white/5 border-b border-slate-200 dark:border-white/5 text-[10px] font-bold uppercase text-slate-500">
+                                       <th className="pl-4 pr-1 py-3 w-8">
+                                          <button
+                                             onClick={() => {
+                                                if (selectedDemandIds.size === demands.length) setSelectedDemandIds(new Set());
+                                                else setSelectedDemandIds(new Set(demands.map(d => d.id)));
+                                             }}
+                                             className={`size-4 rounded border-2 flex items-center justify-center transition-colors ${selectedDemandIds.size === demands.length && demands.length > 0 ? 'bg-primary border-primary text-slate-900' : 'border-slate-300 dark:border-white/20'}`}
+                                          >
+                                             {selectedDemandIds.size === demands.length && demands.length > 0 && <span className="material-symbols-outlined text-[10px]">check</span>}
                                           </button>
-                                       </div>
-                                    </div>
-                                 </div>
-                              );
-                           })}
-                        </div>
-                     )}
-
-                     {activeTab === 'quadro' && (
-                        <div className="flex gap-4 overflow-x-auto h-[600px] pb-4 items-start pb-6 custom-scrollbar">
-                           {['A Fazer', 'Em execução', 'Entregue'].map(statusGroup => {
-                              const groupDemands = demands.filter(d => 
-                                 (statusGroup === 'A Fazer' && d.workStatus === 'A Fazer') ||
-                                 (statusGroup === 'Em execução' && d.workStatus === 'Em Execução') ||
-                                 (statusGroup === 'Entregue' && d.workStatus === 'Entregue')
-                              );
-
-                              return (
-                                 <div key={statusGroup} className="bg-slate-100 dark:bg-surface-dark border border-slate-200 dark:border-white/5 rounded-xl w-[280px] shrink-0 p-3 flex flex-col max-h-full">
-                                    <div className="flex items-center justify-between mb-3 px-1">
-                                       <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">{statusGroup}</h4>
-                                       <button className="text-slate-400 hover:text-slate-600"><span className="material-symbols-outlined text-sm">more_horiz</span></button>
-                                    </div>
-                                    
-                                    <div className="space-y-2 overflow-y-auto custom-scrollbar flex-1 pr-1 pb-2">
-                                       {groupDemands.map(d => (
-                                          <div key={d.id} onClick={() => openDemandDetails(d)} className="bg-white dark:bg-black/40 border border-slate-200 dark:border-white/5 p-3 rounded-lg shadow-sm hover:ring-2 hover:ring-primary/50 transition-all cursor-pointer group">
-                                             <div className="flex flex-wrap gap-1.5 mb-2">
-                                                {d.priority && (
-                                                   <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
-                                                      d.priority === 'High' || d.priority === 'Alta' ? 'bg-red-500/10 text-red-500' :
-                                                      d.priority === 'Medium' || d.priority === 'Média' ? 'bg-amber-500/10 text-amber-500' :
-                                                      'bg-blue-500/10 text-blue-500'
-                                                   }`}>
-                                                      {d.priority}
-                                                   </span>
-                                                )}
+                                       </th>
+                                       <th className="px-4 py-3">Demanda (Título)</th>
+                                       <th className="px-4 py-3">Responsável</th>
+                                       <th className="px-4 py-3">Prioridade</th>
+                                       <th className="px-4 py-3">Postagem</th>
+                                       <th className="px-4 py-3">Formato</th>
+                                       <th className="px-4 py-3">Entrega</th>
+                                       <th className="px-4 py-3">Serviço</th>
+                                       <th className="px-4 py-3">Prazo</th>
+                                       <th className="px-4 py-3">Progresso</th>
+                                       <th className="px-4 py-3 text-right">Valor</th>
+                                       <th className="px-4 py-3 text-center">Pagamento</th>
+                                    </tr>
+                                 </thead>
+                                 <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                                    {demands
+                                       .filter(d => filterAssignee === 'all' || d.assigneeName === filterAssignee)
+                                       .map(demand => (
+                                       <tr key={demand.id} onClick={() => openDemandDetails(demand)} className={`hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors cursor-pointer group ${selectedDemandIds.has(demand.id) ? 'bg-primary/5' : ''}`}>
+                                          <td className="pl-4 pr-1 py-3" onClick={e => e.stopPropagation()}>
+                                             <button
+                                                onClick={() => {
+                                                   setSelectedDemandIds(prev => {
+                                                      const next = new Set(prev);
+                                                      if (next.has(demand.id)) next.delete(demand.id); else next.add(demand.id);
+                                                      return next;
+                                                   });
+                                                }}
+                                                className={`size-4 rounded border-2 flex items-center justify-center transition-colors ${selectedDemandIds.has(demand.id) ? 'bg-primary border-primary text-slate-900' : 'border-slate-300 dark:border-white/20'}`}
+                                             >
+                                                {selectedDemandIds.has(demand.id) && <span className="material-symbols-outlined text-[10px]">check</span>}
+                                             </button>
+                                          </td>
+                                          <td className="px-4 py-3">
+                                             <div className="flex flex-col">
+                                                <span className="text-sm font-bold text-slate-900 dark:text-slate-200 group-hover:text-primary transition-colors" title={demand.title}>{demand.title}</span>
+                                                <span className={`inline-flex px-1.5 py-0.5 mt-1 rounded text-[9px] font-bold border w-fit ${getTypeStyle(demand.type)}`}>
+                                                   {demand.type} {demand.totalQuantity > 1 ? `(${demand.totalQuantity} Itens)` : ''}
+                                                </span>
                                              </div>
-                                             <h5 className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-3">{d.title}</h5>
-                                             <div className="flex items-center justify-between mt-auto">
-                                                {d.assigneeName ? (
-                                                      <div className="size-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[10px] font-bold" title={d.assigneeName}>
-                                                         {d.assigneeName.charAt(0)}
-                                                      </div>
-                                                ) : <div className="size-6 border border-dashed border-slate-300 rounded-full"></div>}
-                                                <div className="flex items-center gap-1 text-slate-400 text-xs">
-                                                   <span className="material-symbols-outlined text-[13px]">event</span>
-                                                   {d.dueDate !== 'Sem prazo' ? formatDisplayDate(d.dueDate) : '-'}
+                                          </td>
+                                          <td className="px-4 py-3">
+                                             <div className="flex items-center gap-2">
+                                                <div className="size-6 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center text-[10px] font-bold text-slate-500">
+                                                   {demand.assigneeName ? demand.assigneeName.substring(0, 1) : '?'}
                                                 </div>
+                                                <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                                                   {demand.assigneeName || 'N/A'}
+                                                </span>
                                              </div>
-                                          </div>
-                                       ))}
-                                    </div>
-
-                                    <button onClick={() => setIsDemandModalOpen(true)} className="mt-2 text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 dark:hover:bg-white/5 text-sm font-medium flex items-center justify-center gap-1 w-full py-2 rounded-lg transition-colors">
-                                       <span className="material-symbols-outlined text-[16px]">add</span> Adicionar tarefa
-                                    </button>
-                                 </div>
-                              );
-                           })}
-                        </div>
-                     )}
-
-                     {activeTab === 'cronograma' && (
-                        <div className="h-full flex flex-col items-center justify-center text-slate-400 py-16 text-center">
-                           <span className="material-symbols-outlined text-4xl mb-4">view_timeline</span>
-                           <h4 className="text-lg font-bold text-slate-700 dark:text-slate-300">Cronograma</h4>
-                           <p className="text-sm">Recurso Premium Asana.</p>
-                        </div>
-                     )}
-
-                     {activeTab === 'painel' && (
-                        <div className="h-full flex flex-col items-center justify-center text-slate-400 py-16 text-center">
-                           <span className="material-symbols-outlined text-4xl mb-4">monitoring</span>
-                           <h4 className="text-lg font-bold text-slate-700 dark:text-slate-300">Painel</h4>
-                           <p className="text-sm">Desenvolvimento em andamento.</p>
-                        </div>
-                     )}
-
-                     {activeTab === 'calendario' && (
-                        <div className="h-full flex flex-col items-center justify-center text-slate-400 py-16 text-center">
-                           <span className="material-symbols-outlined text-4xl mb-4">calendar_month</span>
-                           <h4 className="text-lg font-bold text-slate-700 dark:text-slate-300">Calendário</h4>
-                           <p className="text-sm">Integração futura.</p>
-                        </div>
-                     )}
+                                          </td>
+                                          <td className="px-4 py-3">
+                                             <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                                demand.priority === 'High' || demand.priority === 'Alta' ? 'bg-red-500/10 text-red-500' :
+                                                demand.priority === 'Medium' || demand.priority === 'Média' ? 'bg-amber-500/10 text-amber-500' :
+                                                demand.priority === 'Low' || demand.priority === 'Baixa' ? 'bg-blue-500/10 text-blue-500' :
+                                                'bg-slate-100 dark:bg-white/5 text-slate-400'
+                                             }`}>
+                                                {demand.priority || '—'}
+                                             </span>
+                                          </td>
+                                          <td className="px-4 py-3 text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">{demand.postingDate || '—'}</td>
+                                          <td className="px-4 py-3 text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">{demand.format || '—'}</td>
+                                          <td className="px-4 py-3 text-[11px] text-slate-500 dark:text-slate-400 whitespace-nowrap">{demand.deliveryDate || '—'}</td>
+                                          <td className="px-4 py-3">
+                                             {(() => {
+                                                const svc = getServiceName(demand.priceItemId);
+                                                return svc ? (
+                                                   <div className="flex flex-col gap-0.5">
+                                                      <span className="text-xs text-slate-600 dark:text-slate-300" title={svc.title}>{svc.title}</span>
+                                                      <span className={`text-[9px] font-bold w-fit ${svc.status === 'Criação' ? 'text-blue-500' : 'text-amber-500'}`}>{svc.status}</span>
+                                                   </div>
+                                                ) : <span className="text-xs text-slate-400 italic">—</span>;
+                                             })()}
+                                          </td>
+                                          <td className="px-4 py-3 text-xs text-slate-500">{demand.dueDate}</td>
+                                          <td className="px-4 py-3">
+                                             {demand.type === 'Pacote' ? (
+                                                <div className="flex flex-col gap-1.5 min-w-[100px]" onClick={e => e.stopPropagation()}>
+                                                   <div className="flex justify-between text-[10px] font-bold">
+                                                      <span className={demand.workStatus === 'Entregue' ? 'text-emerald-500' : 'text-slate-500'}>{demand.workStatus}</span>
+                                                      <span className="text-primary">{demand.completedQuantity}/{demand.totalQuantity}</span>
+                                                   </div>
+                                                   <div className="w-full bg-slate-100 dark:bg-black/40 h-1.5 rounded-full overflow-hidden">
+                                                      <div className={`h-full rounded-full transition-all ${demand.workStatus === 'Entregue' ? 'bg-emerald-500' : 'bg-primary'}`} style={{ width: `${(demand.completedQuantity / demand.totalQuantity) * 100}%` }}></div>
+                                                   </div>
+                                                </div>
+                                             ) : (
+                                                <button
+                                                   onClick={(e) => { e.stopPropagation(); toggleWorkStatusAvulso(demand.id); }}
+                                                   className={`px-2 py-1 rounded text-[10px] font-bold border transition-colors ${demand.workStatus === 'Entregue' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                                                      demand.workStatus === 'Entregue' ? 'bg-primary/10 text-primary border-primary/20' :
+                                                         'bg-slate-100 dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10 hover:border-slate-300'
+                                                      }`}
+                                                >
+                                                   {demand.workStatus}
+                                                </button>
+                                             )}
+                                          </td>
+                                          <td className="px-4 py-3 text-sm font-black text-right text-slate-900 dark:text-white whitespace-nowrap">R$ {demand.amount.toFixed(2)}</td>
+                                          <td className="px-4 py-3 text-center">
+                                             <button
+                                                onClick={(e) => { e.stopPropagation(); togglePaymentStatus(demand.id); }}
+                                                className={`px-2 py-1 rounded text-[10px] font-bold border transition-colors cursor-pointer ${demand.paymentStatus === 'Pago'
+                                                   ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                                                   : demand.paymentStatus === 'A Pagar'
+                                                      ? 'bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500 hover:text-white'
+                                                      : 'bg-amber-500/10 text-amber-500 border-amber-500/20 hover:bg-amber-500 hover:text-white'
+                                                   }`}
+                                             >
+                                                {demand.paymentStatus}
+                                             </button>
+                                          </td>
+                                       </tr>
+                                    ))}
+                                 </tbody>
+                              </table>
+                           </div>
+                        ) : (
+                           <div className="p-8 text-center text-slate-500 text-sm flex flex-col items-center">
+                              <span className="material-symbols-outlined text-3xl mb-2 opacity-50">list_alt</span>
+                              Nenhuma demanda associada. Adicione itens da Tabela de Preços.
+                           </div>
+                        )}
+                     </div>
 
                      {/* Barra flutuante de exclusão */}
                      {selectedDemandIds.size > 0 && (
@@ -1235,21 +930,6 @@ const ProjectDetails: React.FC = () => {
                      <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Data de Entrega</label>
                         <input type="date" value={newDemandForm.dueDate} onChange={e => setNewDemandForm({ ...newDemandForm, dueDate: e.target.value })} className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-3 py-2 text-sm text-slate-900 dark:text-white focus:ring-primary/50 outline-none [color-scheme:light] dark:[color-scheme:dark]" />
-                     </div>
-
-                     <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Custo Freelancer/Ferramenta</label>
-                        <div className="relative">
-                           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">payments</span>
-                           <input
-                              type="number"
-                              step="0.01"
-                              value={newDemandForm.cost || ''}
-                              onChange={e => setNewDemandForm({ ...newDemandForm, cost: parseFloat(e.target.value) || 0 })}
-                              className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-white focus:ring-primary/50 outline-none placeholder:text-slate-400"
-                              placeholder="0.00"
-                           />
-                        </div>
                      </div>
 
                      {selectedPriceItem && (
@@ -1435,45 +1115,6 @@ const ProjectDetails: React.FC = () => {
                                        <span className="material-symbols-outlined text-sm">payments</span> Valor
                                     </span>
                                     <div className="text-xs font-bold text-slate-700 dark:text-slate-200 py-1 px-2 -ml-2">R$ {activeDemand.amount.toFixed(2)}</div>
-                                 </div>
-
-                                 {/* Custo (edicao) */}
-                                 <div className="flex items-center gap-3 min-h-8 group/cost">
-                                    <span className="text-[11px] font-bold text-slate-400 uppercase w-32 flex items-center gap-1.5 shrink-0">
-                                       <span className="material-symbols-outlined text-sm">payments</span> Custo
-                                    </span>
-                                    <div className="flex-1">
-                                       {isEditingDemandCost ? (
-                                          <div className="flex items-center gap-1">
-                                             <input
-                                                type="number"
-                                                step="0.01"
-                                                value={demandCostInput}
-                                                onChange={e => setDemandCostInput(parseFloat(e.target.value) || 0)}
-                                                className="w-24 bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/10 rounded-lg px-2 py-1 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 outline-none"
-                                                autoFocus
-                                                onKeyDown={(e) => { if (e.key === 'Enter') saveDemandEdits(); }}
-                                             />
-                                             <button onClick={saveDemandEdits} className="text-emerald-500 p-1">
-                                                <span className="material-symbols-outlined text-sm block font-bold">check</span>
-                                             </button>
-                                             <button onClick={() => setIsEditingDemandCost(false)} className="text-slate-400 p-1">
-                                                <span className="material-symbols-outlined text-sm block font-bold">close</span>
-                                             </button>
-                                          </div>
-                                       ) : (
-                                          <div 
-                                             className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/5 py-1 px-2 rounded -ml-2 transition-colors"
-                                             onClick={() => {
-                                                setDemandCostInput(activeDemand.cost || 0);
-                                                setIsEditingDemandCost(true);
-                                             }}
-                                          >
-                                             <span className="text-xs font-bold text-slate-700 dark:text-slate-200">R$ {(activeDemand.cost || 0).toFixed(2)}</span>
-                                             <span className="material-symbols-outlined text-[10px] text-slate-400 opacity-0 group-hover/cost:opacity-100 transition-opacity">edit</span>
-                                          </div>
-                                       )}
-                                    </div>
                                  </div>
                               </div>
 
@@ -1761,160 +1402,16 @@ const ProjectDetails: React.FC = () => {
                            className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 outline-none transition-all"
                         />
                      </div>
-                     <div className="max-h-[450px] overflow-y-auto custom-scrollbar pr-2 space-y-5">
-                        <div>
-                           <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Função / Categoria do Trabalho *</label>
-                           <div className="relative">
-                             <select
-                               required
-                               value={editProjectForm.category}
-                               onChange={e => setEditProjectForm({ ...editProjectForm, category: e.target.value })}
-                               className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 outline-none transition-all appearance-none cursor-pointer"
-                             >
-                               <option value="Design">🎨 Design</option>
-                               <option value="Marketing">📈 Marketing</option>
-                               <option value="Planejamento de criação">📝 Planejamento de criação</option>
-                               <option value="Sprints de design">⚡ Sprints de design</option>
-                               <option value="Criação de ativo">💎 Criação de ativo</option>
-                               <option value="Calendário de conteúdo">🗓️ Calendário de conteúdo</option>
-                               <option value="Planejamento estratégico">🎯 Planejamento estratégico</option>
-                               <option value="Gestão de projetos">📂 Gestão de projetos</option>
-                               <option value="Tecnologia da informação (TI)">💻 TI / Desenvolvimento</option>
-                               <option value="Outros">⚙️ Outros</option>
-                             </select>
-                             <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">expand_more</span>
-                           </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                           <div>
-                              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Link Gmail</label>
-                              <input
-                                 type="text"
-                                 value={editProjectForm.gmailLink}
-                                 onChange={e => setEditProjectForm({ ...editProjectForm, gmailLink: e.target.value })}
-                                 className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 outline-none transition-all"
-                                 placeholder="https://mail.google.com/..."
-                              />
-                           </div>
-                           <div>
-                              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Link Outlook</label>
-                              <input
-                                 type="text"
-                                 value={editProjectForm.outlookLink}
-                                 onChange={e => setEditProjectForm({ ...editProjectForm, outlookLink: e.target.value })}
-                                 className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 outline-none transition-all"
-                                 placeholder="https://outlook.office.com/..."
-                              />
-                           </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                           <div>
-                              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Google Drive</label>
-                              <input
-                                 type="text"
-                                 value={editProjectForm.driveLink}
-                                 onChange={e => setEditProjectForm({ ...editProjectForm, driveLink: e.target.value })}
-                                 className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 outline-none transition-all"
-                                 placeholder="https://drive.google.com/..."
-                              />
-                           </div>
-                           <div>
-                              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Dropbox</label>
-                              <input
-                                 type="text"
-                                 value={editProjectForm.dropboxLink}
-                                 onChange={e => setEditProjectForm({ ...editProjectForm, dropboxLink: e.target.value })}
-                                 className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 outline-none transition-all"
-                                 placeholder="https://www.dropbox.com/..."
-                              />
-                           </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                           <div>
-                              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Figma</label>
-                              <input
-                                 type="text"
-                                 value={editProjectForm.figmaLink}
-                                 onChange={e => setEditProjectForm({ ...editProjectForm, figmaLink: e.target.value })}
-                                 className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 outline-none transition-all"
-                                 placeholder="https://www.figma.com/..."
-                              />
-                           </div>
-                           <div>
-                              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Notion</label>
-                              <input
-                                 type="text"
-                                 value={editProjectForm.notionLink}
-                                 onChange={e => setEditProjectForm({ ...editProjectForm, notionLink: e.target.value })}
-                                 className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 outline-none transition-all"
-                                 placeholder="https://notion.so/..."
-                              />
-                           </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                           <div>
-                              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Zoom</label>
-                              <input
-                                 type="text"
-                                 value={editProjectForm.zoomLink}
-                                 onChange={e => setEditProjectForm({ ...editProjectForm, zoomLink: e.target.value })}
-                                 className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 outline-none transition-all"
-                              />
-                           </div>
-                           <div>
-                              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Teams</label>
-                              <input
-                                 type="text"
-                                 value={editProjectForm.teamsLink}
-                                 onChange={e => setEditProjectForm({ ...editProjectForm, teamsLink: e.target.value })}
-                                 className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 outline-none transition-all"
-                              />
-                           </div>
-                           <div>
-                              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Google Meet</label>
-                              <input
-                                 type="text"
-                                 value={editProjectForm.meetLink}
-                                 onChange={e => setEditProjectForm({ ...editProjectForm, meetLink: e.target.value })}
-                                 className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 outline-none transition-all"
-                              />
-                           </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                           <div>
-                              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">GitHub (User/Repo)</label>
-                              <input
-                                 type="text"
-                                 value={editProjectForm.githubRepo}
-                                 onChange={e => setEditProjectForm({ ...editProjectForm, githubRepo: e.target.value })}
-                                 className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 outline-none transition-all"
-                              />
-                           </div>
-                           <div>
-                              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Adobe Acrobat Studio</label>
-                              <input
-                                 type="text"
-                                 value={editProjectForm.adobeStudioLink}
-                                 onChange={e => setEditProjectForm({ ...editProjectForm, adobeStudioLink: e.target.value })}
-                                 className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 outline-none transition-all"
-                              />
-                           </div>
-                        </div>
-
-                        <div className="pt-2 border-t border-slate-100 dark:border-white/5 opacity-80">
-                           <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ID Asana (Opcional)</label>
-                           <input
-                              type="text"
-                              value={editProjectForm.asanaProjectId}
-                              onChange={e => setEditProjectForm({ ...editProjectForm, asanaProjectId: e.target.value })}
-                              className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 outline-none transition-all"
-                           />
-                        </div>
+                     <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">ID do Projeto no Asana</label>
+                        <input
+                           type="text"
+                           value={editProjectForm.asanaProjectId}
+                           onChange={e => setEditProjectForm({ ...editProjectForm, asanaProjectId: e.target.value })}
+                           className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 outline-none transition-all"
+                           placeholder="Ex: 1213200206518330"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">ID encontrado na URL do projeto no Asana.</p>
                      </div>
                      <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-white/10">
                         <button onClick={() => setIsEditProjectOpen(false)} className="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">

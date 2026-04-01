@@ -16,18 +16,7 @@ function mapRow(row: any): Project {
         description: row.description || '',
         driveLink: row.drive_link || '',
         externalSystemLink: row.external_system_link || '',
-        asanaProjectId: row.asana_project_id || '',
-        figmaLink: row.figma_link || '',
-        githubRepo: row.github_repo || '',
-        notionLink: row.notion_link || '',
-        zoomLink: row.zoom_link || '',
-        teamsLink: row.teams_link || '',
-        dropboxLink: row.dropbox_link || '',
-        meetLink: row.meet_link || '',
-        adobeStudioLink: row.adobe_studio_link || '',
-        gmailLink: row.gmail_link || '',
-        outlookLink: row.outlook_link || '',
-        category: row.category || ''
+        asanaProjectId: row.asana_project_id || ''
     };
 }
 
@@ -68,18 +57,7 @@ export function useProjects() {
                 description: project.description || '',
                 drive_link: project.driveLink || '',
                 external_system_link: project.externalSystemLink || '',
-                asana_project_id: project.asanaProjectId || '',
-                figma_link: project.figmaLink || '',
-                github_repo: project.githubRepo || '',
-                notion_link: project.notionLink || '',
-                zoom_link: project.zoomLink || '',
-                teams_link: project.teamsLink || '',
-                dropbox_link: project.dropboxLink || '',
-                meet_link: project.meetLink || '',
-                adobe_studio_link: project.adobeStudioLink || '',
-                gmail_link: project.gmailLink || '',
-                outlook_link: project.outlookLink || '',
-                category: project.category || ''
+                asana_project_id: project.asanaProjectId || ''
             })
             .select()
             .single();
@@ -107,17 +85,6 @@ export function useProjects() {
         if (updates.driveLink !== undefined) dbUpdates.drive_link = updates.driveLink;
         if (updates.externalSystemLink !== undefined) dbUpdates.external_system_link = updates.externalSystemLink;
         if (updates.asanaProjectId !== undefined) dbUpdates.asana_project_id = updates.asanaProjectId;
-        if (updates.figmaLink !== undefined) dbUpdates.figma_link = updates.figmaLink;
-        if (updates.githubRepo !== undefined) dbUpdates.github_repo = updates.githubRepo;
-        if (updates.notionLink !== undefined) dbUpdates.notion_link = updates.notionLink;
-        if (updates.zoomLink !== undefined) dbUpdates.zoom_link = updates.zoomLink;
-        if (updates.teamsLink !== undefined) dbUpdates.teams_link = updates.teamsLink;
-        if (updates.dropboxLink !== undefined) dbUpdates.dropbox_link = updates.dropboxLink;
-        if (updates.meetLink !== undefined) dbUpdates.meet_link = updates.meetLink;
-        if (updates.adobeStudioLink !== undefined) dbUpdates.adobe_studio_link = updates.adobeStudioLink;
-        if (updates.gmailLink !== undefined) dbUpdates.gmail_link = updates.gmailLink;
-        if (updates.outlookLink !== undefined) dbUpdates.outlook_link = updates.outlookLink;
-        if (updates.category !== undefined) dbUpdates.category = updates.category;
 
         const { error } = await supabase.from('projects').update(dbUpdates).eq('id', id);
         if (error) {

@@ -18,8 +18,7 @@ const Projects: React.FC = () => {
     clientId: '',
     dueDate: '',
     description: '',
-    asanaProjectId: '',
-    category: 'Design'
+    asanaProjectId: ''
   });
 
   // Checar se a rota solicitou a abertura do modal (ex: clicando no header)
@@ -88,13 +87,12 @@ const Projects: React.FC = () => {
       status: 'A Fazer',
       dueDate: formattedDate,
       description: newProjectForm.description,
-      asanaProjectId: newProjectForm.asanaProjectId,
-      category: newProjectForm.category
+      asanaProjectId: newProjectForm.asanaProjectId
     });
 
     // Fecha e reseta
     setIsNewModalOpen(false);
-    setNewProjectForm({ title: '', clientId: '', dueDate: '', description: '', asanaProjectId: '', category: 'Design' });
+    setNewProjectForm({ title: '', clientId: '', dueDate: '', description: '', asanaProjectId: '' });
   };
 
 
@@ -149,16 +147,7 @@ const Projects: React.FC = () => {
               {projects.map((project) => (
                 <tr key={project.id} onClick={() => navigate(`/projetos/${project.id}`)} className="hover:bg-slate-50/80 dark:hover:bg-white/[0.02] transition-colors group cursor-pointer">
                   <td className="px-6 py-4">
-                    <div className="flex flex-col gap-1">
-                      <span className="block text-sm font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">{project.title}</span>
-                      <div className="flex items-center gap-2">
-                        {project.githubRepo && <span className="material-symbols-outlined text-[14px] text-slate-400" title="GitHub linked">code</span>}
-                        {project.figmaLink && <span className="material-symbols-outlined text-[14px] text-slate-400" title="Figma linked">brush</span>}
-                        {project.notionLink && <span className="material-symbols-outlined text-[14px] text-slate-400" title="Notion linked">notes</span>}
-                        {project.driveLink && <span className="material-symbols-outlined text-[14px] text-slate-400" title="Google Drive linked">add_to_drive</span>}
-                        {(project.zoomLink || project.teamsLink) && <span className="material-symbols-outlined text-[14px] text-slate-400" title="Meeting link available">videocam</span>}
-                      </div>
-                    </div>
+                    <span className="block text-sm font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">{project.title}</span>
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{project.client}</td>
                   <td className="px-6 py-4">
@@ -242,30 +231,6 @@ const Projects: React.FC = () => {
                   className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 outline-none transition-all placeholder:text-slate-400"
                   placeholder="Ex: Redesign Landing Page"
                 />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Função / Categoria do Trabalho *</label>
-                <div className="relative">
-                  <select
-                    required
-                    value={newProjectForm.category}
-                    onChange={e => setNewProjectForm({ ...newProjectForm, category: e.target.value })}
-                    className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 outline-none transition-all appearance-none cursor-pointer"
-                  >
-                    <option value="Design">🎨 Design</option>
-                    <option value="Marketing">📈 Marketing</option>
-                    <option value="Planejamento de criação">📝 Planejamento de criação</option>
-                    <option value="Sprints de design">⚡ Sprints de design</option>
-                    <option value="Criação de ativo">💎 Criação de ativo</option>
-                    <option value="Calendário de conteúdo">🗓️ Calendário de conteúdo</option>
-                    <option value="Planejamento estratégico">🎯 Planejamento estratégico</option>
-                    <option value="Gestão de projetos">📂 Gestão de projetos</option>
-                    <option value="Tecnologia da informação (TI)">💻 TI / Desenvolvimento</option>
-                    <option value="Outros">⚙️ Outros</option>
-                  </select>
-                  <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">expand_more</span>
-                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">

@@ -33,15 +33,10 @@ const Layout: React.FC = () => {
   };
 
   useEffect(() => {
-    const onboardingComplete = localStorage.getItem('freela_onboarding_complete');
-    if (!onboardingComplete) {
-      navigate('/onboarding');
-      return;
-    }
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 15000); // Poll every 15s
     return () => clearInterval(interval);
-  }, [navigate]);
+  }, []);
 
   // Close panel on outside click
   useEffect(() => {

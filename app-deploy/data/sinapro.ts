@@ -1,0 +1,62 @@
+import { PriceTableItem } from '../types';
+
+export const SINAPRO_ITEMS = [
+    { title: 'Criação de Campanha (Key Visual)', type: 'Projeto', price: 50884.69, category: 'Advertising' },
+    { title: 'Anúncio Revista - Página Dupla', type: 'Avulso', price: 16200.78, category: 'Advertising' },
+    { title: 'Anúncio Revista - 1 Página', type: 'Avulso', price: 12432.78, category: 'Advertising' },
+    { title: 'Anúncio Revista - 2/3 Página', type: 'Avulso', price: 10288.79, category: 'Advertising' },
+    { title: 'Anúncio Revista - 1/2 Página', type: 'Avulso', price: 8545.36, category: 'Advertising' },
+    { title: 'Anúncio Revista - 1/3 Página', type: 'Avulso', price: 7101.95, category: 'Advertising' },
+    { title: 'Anúncio Revista - Valor Mínimo', type: 'Avulso', price: 4973.99, category: 'Advertising' },
+    
+    { title: 'Anúncio Jornal - Página Dupla', type: 'Avulso', price: 19432.78, category: 'Advertising' },
+    { title: 'Anúncio Jornal - 1 Página', type: 'Avulso', price: 14932.15, category: 'Advertising' },
+    { title: 'Anúncio Jornal - Rouba Página', type: 'Avulso', price: 11745.31, category: 'Advertising' },
+    { title: 'Anúncio Jornal - 1/2 Página', type: 'Avulso', price: 11334.57, category: 'Advertising' },
+    { title: 'Anúncio Jornal - 1/3 Página', type: 'Avulso', price: 10569.91, category: 'Advertising' },
+    { title: 'Anúncio Jornal - 1/4 Página', type: 'Avulso', price: 9505.19, category: 'Advertising' },
+    { title: 'Anúncio Jornal - Valor Mínimo', type: 'Avulso', price: 8201.62, category: 'Advertising' },
+
+    { title: 'Legal/Balanço - Página Dupla', type: 'Avulso', price: 7961.29, category: 'Advertising' },
+    { title: 'Legal/Balanço - 1 Página', type: 'Avulso', price: 5326.47, category: 'Advertising' },
+    { title: 'Legal/Balanço - Rouba/Meia Pág', type: 'Avulso', price: 4188.93, category: 'Advertising' },
+    { title: 'Legal/Balanço - Valor Mínimo', type: 'Avulso', price: 3185.39, category: 'Advertising' },
+
+    { title: 'Marca / Logotipo p/ Empresa ou Órgão Público', type: 'Projeto', price: 48411.53, category: 'Branding' },
+    { title: 'Marca / Logotipo Produto', type: 'Projeto', price: 38730.09, category: 'Branding' },
+    { title: 'Marca / Logotipo Imobiliário', type: 'Projeto', price: 30984.37, category: 'Branding' },
+    { title: 'Marca / Logotipo Eventos', type: 'Projeto', price: 35824.35, category: 'Branding' },
+    { title: 'Marca / Logotipo - Reformulação', type: 'Projeto', price: 36309.37, category: 'Branding' },
+    { title: 'Manual de Identidade Visual (por lâmina)', type: 'Avulso', price: 2538.70, category: 'Branding' },
+    { title: 'Slogan', type: 'Avulso', price: 14524.33, category: 'Branding' },
+    { title: 'Selo Comemorativo / Ação de Governo', type: 'Avulso', price: 17291.70, category: 'Branding' },
+    { title: 'Ícones e Símbolos', type: 'Avulso', price: 1884.73, category: 'Branding' },
+
+    { title: 'Papelaria - Bloco de Anotações', type: 'Avulso', price: 5341.50, category: 'Branding' },
+    { title: 'Papelaria - Cartão de Visita', type: 'Avulso', price: 5487.85, category: 'Branding' },
+    { title: 'Papelaria - Cartão Visita Alteração', type: 'Avulso', price: 532.87, category: 'Branding' },
+    { title: 'Papelaria - Envelope Simples', type: 'Avulso', price: 7180.25, category: 'Branding' },
+    { title: 'Papelaria - Envelope Saco / Ofício', type: 'Avulso', price: 6164.23, category: 'Branding' },
+    { title: 'Papelaria - Papel Carta / Ofício', type: 'Avulso', price: 5513.43, category: 'Branding' },
+    { title: 'Papelaria - Papel Embrulho / Presente', type: 'Avulso', price: 8393.76, category: 'Branding' },
+    { title: 'Papelaria - Pasta', type: 'Avulso', price: 9884.39, category: 'Branding' },
+
+    { title: 'Materiais Especiais - House Organ (4 pág)', type: 'Projeto', price: 34941.71, category: 'Branding' },
+    { title: 'House Organ (por pág adicional)', type: 'Avulso', price: 6978.14, category: 'Branding' },
+    { title: 'Relatório Diretoria (Projeto)', type: 'Projeto', price: 197757.85, category: 'Branding' },
+    { title: 'Relatório Diretoria (Finalização p/ pág)', type: 'Avulso', price: 4931.75, category: 'Branding' },
+    { title: 'Embalagem p/ Relatório', type: 'Avulso', price: 25984.16, category: 'Branding' },
+    { title: 'Revista/Livro - Projeto Editorial', type: 'Projeto', price: 144608.29, category: 'Branding' },
+    { title: 'Revista/Livro - Finalização p/ pág', type: 'Avulso', price: 2078.44, category: 'Branding' },
+    { title: 'Revista/Livro - Capa', type: 'Avulso', price: 8141.90, category: 'Branding' },
+    { title: 'Revista/Livro - Miolo (por pág)', type: 'Avulso', price: 6625.67, category: 'Branding' },
+    { title: 'Uniforme', type: 'Avulso', price: 27327.08, category: 'Branding' },
+].map(item => ({
+    id: 'sinapro_' + crypto.randomUUID(),
+    title: item.title,
+    type: item.type as any,
+    price: item.price,
+    description: `Referência Sinapro SP 2025/2026 (${item.category})`,
+    quantity: 1,
+    status: 'Criação' 
+}));

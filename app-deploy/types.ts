@@ -14,17 +14,6 @@ export interface Project {
   driveLink?: string;
   externalSystemLink?: string;
   asanaProjectId?: string;
-  figmaLink?: string;
-  githubRepo?: string;
-  notionLink?: string;
-  zoomLink?: string;
-  teamsLink?: string;
-  dropboxLink?: string;
-  meetLink?: string;
-  adobeStudioLink?: string;
-  gmailLink?: string;
-  outlookLink?: string;
-  category?: string;
 }
 
 export type PriceItemType = 'Avulso' | 'Pacote';
@@ -54,7 +43,6 @@ export interface ProjectDemand {
   title: string;
   type: PriceItemType;
   amount: number;
-  cost?: number; // Custo do freelancer ou ferramenta
   dueDate: string;
   workStatus: 'A Fazer' | 'Entregue';
   paymentStatus: 'Pendente' | 'A Pagar' | 'Pago';

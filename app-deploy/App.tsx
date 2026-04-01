@@ -13,8 +13,6 @@ import ClientPanel from './pages/ClientPanel';
 import Notes from './pages/Notes';
 import Passwords from './pages/Passwords';
 import Settings from './pages/Settings';
-import Onboarding from './pages/Onboarding';
-
 
 const App: React.FC = () => {
   return (
@@ -33,8 +31,6 @@ const App: React.FC = () => {
           <Route path="configuracoes" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
-        {/* Rota de Onboarding (sem layout admin) */}
-        <Route path="/onboarding" element={<PasswordGate><Onboarding /></PasswordGate>} />
         {/* Rota pública — Painel do Cliente (sem layout admin) */}
         <Route path="/painel/:clientId" element={<ClientPanel />} />
       </Routes>
