@@ -6,7 +6,8 @@ import { useClients } from '../hooks/useClients';
 import { useProjectDemands } from '../hooks/useProjectDemands';
 import { useAsana } from '../hooks/useAsana';
 import { useDemandComments } from '../hooks/useDemandComments';
-import { Project, Client, ProjectDemand, SubDemand, PriceTableItem } from '../types';
+import { useAttachments } from '../hooks/useAttachments';
+import { Project, Client, ProjectDemand, SubDemand, PriceTableItem, ProjectAttachment } from '../types';
 
 const formatDisplayDate = (dateStr: string) => {
    if (!dateStr || dateStr === '—' || dateStr === 'Sem prazo') return dateStr;
@@ -31,6 +32,7 @@ const ProjectDetails: React.FC = () => {
    const { clients: allClients } = useClients();
    const { demands, setDemands, loading: demandsLoading, fetchDemands, createDemand, updateDemand, updateSubDemand, deleteDemands } = useProjectDemands(id);
    const { updateTaskStatus, uploadAttachment, getProjectTasks, updateTask: asanaUpdateTask } = useAsana();
+   const { attachments, loading: attachmentsLoading, uploadFile, deleteAttachment } = useAttachments(id || '');
 
    const [project, setProject] = useState<Project | null>(null);
    const [client, setClient] = useState<Client | null>(null);
@@ -1177,6 +1179,75 @@ const ProjectDetails: React.FC = () => {
                         <span className="text-slate-500">A Receber:</span>
                         <span className="font-bold text-amber-500">R$ {totalPending.toFixed(2)}</span>
                      </div>
+                  </div>
+
+                  {/* NOVO: Seção de Anexos */}
+                  <div className="pt-6 border-t border-slate-200 dark:border-white/5 space-y-4">
+                     <div className="flex items-center justify-between">
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Arquivos e Anexos</p>
+                        <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-bold">{attachments.length}</span>
+                     </div>
+
+                     <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+                        {attachmentsLoading ? (
+                           <div className="flex justify-center py-4">
+                              <div className="size-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                           </div>
+                        ) : attachments.length === 0 ? (
+                           <div className="text-center py-8 bg-white/50 dark:bg-white/5 border border-dashed border-slate-200 dark:border-white/10 rounded-xl">
+                              <span className="material-symbols-outlined text-slate-300 text-3xl mb-1">upload_file</span>
+                              <p className="text-[10px] text-slate-400">Nenhum arquivo anexado</p>
+                           </div>
+                        ) : (
+                           attachments.map(file => (
+                              <div key={file.id} className="group relative flex items-center gap-3 bg-white dark:bg-white/5 border border-slate-100 dark:border-white/5 p-2 rounded-xl hover:border-primary/30 transition-all">
+                                 <div className={`size-10 rounded-lg flex items-center justify-center shrink-0 ${file.type.startsWith('image/') ? 'bg-emerald-500/10 text-emerald-500' : 'bg-blue-500/10 text-blue-500'}`}>
+                                    <span className="material-symbols-outlined text-xl">
+                                       {file.type.startsWith('image/') ? 'image' : 'description'}
+                                    </span>
+                                 </div>
+                                 <div className="flex-1 min-w-0 pr-6">
+                                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{file.name}</p>
+                                    <p className="text-[10px] text-slate-400">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                 </div>
+                                 
+                                 <div className="absolute right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <a href={file.url} target="_blank" rel="noopener noreferrer" className="size-7 rounded-lg bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 flex items-center justify-center hover:bg-primary hover:text-slate-900 transition-all">
+                                       <span className="material-symbols-outlined text-sm">download</span>
+                                    </a>
+                                    <button onClick={() => deleteAttachment(file.id, file.url)} className="size-7 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all">
+                                       <span className="material-symbols-outlined text-sm">delete</span>
+                                    </button>
+                                 </div>
+                              </div>
+                           ))
+                        )}
+                     </div>
+
+                     {/* Upload Area */}
+                     <label className="block w-full cursor-pointer group">
+                        <input 
+                           type="file" 
+                           className="hidden" 
+                           disabled={attachmentsLoading}
+                           accept="image/png,image/jpeg,application/pdf"
+                           onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                 if (file.size > 5 * 1024 * 1024) {
+                                    alert('Arquivo muito grande! Limite de 5MB.');
+                                    return;
+                                 }
+                                 await uploadFile(file);
+                                 e.target.value = '';
+                              }
+                           }}
+                        />
+                        <div className="flex items-center justify-center gap-2 py-3 border-2 border-dashed border-slate-200 dark:border-white/10 rounded-xl group-hover:border-primary/50 group-hover:bg-primary/5 transition-all text-slate-400 group-hover:text-primary">
+                           <span className="material-symbols-outlined text-sm">add_circle</span>
+                           <span className="text-xs font-bold uppercase tracking-wider">Anexar Arquivo</span>
+                        </div>
+                     </label>
                   </div>
                </div>
             </div>

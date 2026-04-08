@@ -27,6 +27,16 @@ export interface Project {
   category?: string;
 }
 
+export interface ProjectAttachment {
+  id: string;
+  projectId: string;
+  name: string;
+  url: string;
+  type: string;
+  size: number;
+  createdAt: string;
+}
+
 export type PriceItemType = 'Avulso' | 'Pacote';
 
 export interface PriceTableItem {

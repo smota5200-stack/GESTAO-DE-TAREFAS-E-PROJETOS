@@ -69,7 +69,9 @@ const Layout: React.FC = () => {
 
   const navItems = [
     { path: '/', icon: 'dashboard', label: 'Painel' },
+    { path: '/kanban', icon: 'view_kanban', label: 'Kanban' },
     { path: '/projetos', icon: 'work', label: 'Projetos' },
+    { path: '/relatorios', icon: 'insert_chart', label: 'Relatórios' },
     { path: '/precos', icon: 'sell', label: 'Tabela de Preços' },
     { path: '/financas', icon: 'account_balance_wallet', label: 'Finanças' },
     { path: '/clientes', icon: 'group', label: 'Clientes' },

@@ -14,6 +14,8 @@ import Notes from './pages/Notes';
 import Passwords from './pages/Passwords';
 import Settings from './pages/Settings';
 import Onboarding from './pages/Onboarding';
+import Kanban from './pages/Kanban';
+import Reports from './pages/Reports';
 
 
 const App: React.FC = () => {
@@ -22,8 +24,10 @@ const App: React.FC = () => {
       <Routes>
         <Route path="/" element={<PasswordGate><Layout /></PasswordGate>}>
           <Route index element={<Dashboard />} />
+          <Route path="kanban" element={<Kanban />} />
           <Route path="projetos" element={<Projects />} />
           <Route path="projetos/:id" element={<ProjectDetails />} />
+          <Route path="relatorios" element={<Reports />} />
           <Route path="precos" element={<PriceTable />} />
           <Route path="financas" element={<Finances />} />
           <Route path="clientes" element={<Clients />} />
