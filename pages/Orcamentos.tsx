@@ -318,7 +318,7 @@ const Orcamentos: React.FC = () => {
            <div className="bg-white w-full max-w-[800px] min-h-[1050px] shadow-2xl shadow-black/20 flex flex-col font-sans" ref={pdfRef}>
               
               {/* === DARK HEADER BLOCK === */}
-              <div className="bg-[#0B1120] text-slate-200 px-8 py-10 rounded-b-[40px] shadow-md relative overflow-hidden">
+              <div className="bg-[#0B1120] text-slate-200 px-8 py-10 shadow-md relative overflow-hidden">
                 <div className="flex justify-between items-start mb-12">
                    
                    <div className="flex items-center gap-4">
