@@ -122,18 +122,12 @@ const Layout: React.FC = () => {
       {/* Sidebar Navigation */}
       <aside className={`${sidebarCollapsed ? 'w-[72px]' : 'w-64'} flex-shrink-0 border-r border-primary/10 bg-white dark:bg-surface-dark flex flex-col z-30 shadow-xl shadow-black/5 absolute inset-y-0 left-0 transform transition-all duration-300 md:relative md:translate-x-0 ${mobileMenuOpen ? 'translate-x-0 !w-64' : '-translate-x-full'}`}>
         <div className={`p-6 flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'} gap-3`}>
-          <div className="flex items-center gap-3 w-full">
-            <div className={`flex items-center justify-start shrink-0 transition-all ${sidebarCollapsed ? 'w-10' : 'w-24'} h-10 bg-white p-1 rounded-sm`}>
-              <img src="/logo.png" alt="Motta Logo" className="w-full h-full object-contain origin-left" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
-              <span className="material-symbols-outlined text-primary hidden text-3xl">auto_awesome</span>
-            </div>
+          <div className="flex items-center gap-2 w-full justify-center md:justify-start">
+            <span className="text-[#CCFF00] flex items-center shrink-0">
+               <span className="material-symbols-outlined text-3xl !font-[700]" style={{ fontVariationSettings: "'FILL' 1" }}>flare</span>
+            </span>
             {!sidebarCollapsed && (
-              <div className="flex items-center gap-1.5 hidden md:flex">
-                <span className="text-[#CCFF00] flex items-center mt-[-3px]">
-                  <span className="material-symbols-outlined text-xl !font-[700]" style={{ fontVariationSettings: "'FILL' 1" }}>flare</span>
-                </span>
-                <span className="text-[#CCFF00] text-xl font-bold tracking-tight uppercase">FREELANCEOS</span>
-              </div>
+              <span className="text-[#CCFF00] text-xl font-bold tracking-tight uppercase hidden md:inline-block">FREE LANCE OS</span>
             )}
           </div>
           <button className="md:hidden text-slate-500" onClick={() => setMobileMenuOpen(false)}>
