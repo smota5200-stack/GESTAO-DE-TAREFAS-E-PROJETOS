@@ -16,7 +16,24 @@ const Layout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Theme Toggle
+  const [isDark, setIsDark] = useState(() => {
+    const savedTheme = localStorage.getItem('freela_theme');
+    if (savedTheme) return savedTheme === 'dark';
+    return document.documentElement.classList.contains('dark');
+  });
+
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('freela_theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('freela_theme', 'light');
+    }
+  }, [isDark]);
 
   // Notificações
   const [notifications, setNotifications] = useState<PaymentNotification[]>([]);
@@ -71,6 +88,7 @@ const Layout: React.FC = () => {
     { path: '/', icon: 'dashboard', label: 'Painel' },
     { path: '/kanban', icon: 'view_kanban', label: 'Kanban' },
     { path: '/projetos', icon: 'work', label: 'Projetos' },
+    { path: '/orcamentos', icon: 'request_quote', label: 'Orçamentos' },
     { path: '/relatorios', icon: 'insert_chart', label: 'Relatórios' },
     { path: '/precos', icon: 'sell', label: 'Tabela de Preços' },
     { path: '/financas', icon: 'account_balance_wallet', label: 'Finanças' },
@@ -89,10 +107,11 @@ const Layout: React.FC = () => {
       <aside className={`${sidebarCollapsed ? 'w-[72px]' : 'w-64'} flex-shrink-0 border-r border-primary/10 bg-white dark:bg-surface-dark flex flex-col z-30 shadow-xl shadow-black/5 absolute inset-y-0 left-0 transform transition-all duration-300 md:relative md:translate-x-0 ${mobileMenuOpen ? 'translate-x-0 !w-64' : '-translate-x-full'}`}>
         <div className={`p-6 flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'} gap-3`}>
           <div className="flex items-center gap-3">
-            <div className="size-8 bg-primary rounded-lg flex items-center justify-center text-slate-900 shadow-lg shadow-primary/30 shrink-0">
-              <span className="material-symbols-outlined">auto_awesome</span>
+            <div className="size-10 flex items-center justify-center shrink-0">
+              <img src="/logo.png" alt="Motta Logo" className="max-w-full max-h-full object-contain" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
+              <span className="material-symbols-outlined text-primary hidden text-3xl">auto_awesome</span>
             </div>
-            {!sidebarCollapsed && <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">FreelanceOS</h1>}
+            {!sidebarCollapsed && <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white uppercase hidden md:block">FreelanceOS</h1>}
           </div>
           <button className="md:hidden text-slate-500" onClick={() => setMobileMenuOpen(false)}>
             <span className="material-symbols-outlined">close</span>
@@ -177,6 +196,14 @@ const Layout: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3 md:gap-4">
+            {/* Theme Toggle */}
+            <button
+              onClick={() => setIsDark(!isDark)}
+              className="flex items-center justify-center size-10 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white transition-colors"
+              title="Alternar Tema"
+            >
+              <span className="material-symbols-outlined">{isDark ? 'light_mode' : 'dark_mode'}</span>
+            </button>
             {/* Notification Bell */}
             <div className="relative" ref={notifRef}>
               <button
