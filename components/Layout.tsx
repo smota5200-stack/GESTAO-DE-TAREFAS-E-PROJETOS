@@ -18,6 +18,11 @@ const Layout: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
+  // Perfil do Usuário
+  const [userName, setUserName] = useState('Sergio Mota');
+  const [userRole, setUserRole] = useState('Administrador');
+  const [userAvatar, setUserAvatar] = useState('https://ui-avatars.com/api/?name=Sergio+Mota&background=bcd200&color=171717');
+
   // Theme Toggle
   const [isDark, setIsDark] = useState(() => {
     const savedTheme = localStorage.getItem('freela_theme');
@@ -26,6 +31,16 @@ const Layout: React.FC = () => {
   });
 
   useEffect(() => {
+    // Carregar Perfil do localStorage se existir
+    const savedName = localStorage.getItem('freela_user_name');
+    const savedRole = localStorage.getItem('freela_user_role');
+    const savedAvatar = localStorage.getItem('freela_user_avatar');
+
+    if (savedName) setUserName(savedName);
+    if (savedRole) setUserRole(savedRole);
+    if (savedAvatar) setUserAvatar(savedAvatar);
+
+    // Update Theme
     if (isDark) {
       document.documentElement.classList.add('dark');
       localStorage.setItem('freela_theme', 'dark');
@@ -164,11 +179,11 @@ const Layout: React.FC = () => {
           </button>
 
           {!sidebarCollapsed && (
-            <div onClick={() => handleAction('Abrindo perfil do usuário...')} className="flex items-center gap-3 px-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/5 p-2 rounded-lg transition-colors">
-              <div className="size-10 rounded-full bg-slate-800 border-2 border-primary/30 bg-cover bg-center shadow-md shrink-0" style={{ backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuBlqFFBZ45bBVq5-UWioJOTDfCYYvkKnV35mte3xf55FKEq5lAEjQTT952u6PqXU_D4thL6Mv-peJ-LKE76xEgnUAbwqGz76-x4rhJrAPn2-yzozUMb7dx7juCfTRSzQxOraOAqSqmmw0WrxwJ1PHqyA1qH_5Yq0yqLZeIxJNWh7W3e8xB0n5O5LOdlHLVMM3qSpshUYfTonNtl_3L-5WIauhLlCnTLgxbCk2MH0pTYn8wdWyrS1PlRjwaf2qE5SimgKcX-GKMWU556')" }}></div>
+            <div onClick={() => navigate('/configuracoes')} className="flex items-center gap-3 px-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-white/5 p-2 rounded-lg transition-colors">
+              <div className="size-10 rounded-full bg-slate-800 border-2 border-primary/30 bg-cover bg-center shadow-md shrink-0" style={{ backgroundImage: `url('${userAvatar}')` }}></div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate text-slate-900 dark:text-white">Alex Rivera</p>
-                <p className="text-xs text-slate-500 truncate">Senior Designer</p>
+                <p className="text-sm font-semibold truncate text-slate-900 dark:text-white">{userName}</p>
+                <p className="text-xs text-slate-500 truncate">{userRole}</p>
               </div>
               <span className="material-symbols-outlined text-slate-400 text-sm">more_vert</span>
             </div>
