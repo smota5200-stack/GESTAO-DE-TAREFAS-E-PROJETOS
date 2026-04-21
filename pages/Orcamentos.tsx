@@ -331,18 +331,6 @@ const Orcamentos: React.FC = () => {
                         <p className="text-xs text-slate-400 mt-1 font-mono">Ref: {randomRef}</p>
                       </div>
                    </div>
-
-                   {/* Parceria Logos -> Emitting SVG paths or placeholders */}
-                   <div className="flex items-center gap-4">
-                     <div className="text-red-500 font-bold flex items-center gap-1">
-                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M14.86 3.197l8.618 20.612H18.25l-2.023-5.321H7.556L5.617 23.81H.522L9.14 3.197h5.72zm-7.304 15.29h8.887L11.967 7.02z"/></svg>
-                        Adobe
-                     </div>
-                     <div className="text-white font-bold flex items-center gap-1">
-                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M11.4 24H0V12.6h11.4V24zM24 24H12.6V12.6H24V24zM11.4 11.4H0V0h11.4v11.4zM24 11.4H12.6V0H24v11.4z" fill="#00a4ef"/></svg>
-                        Microsoft
-                     </div>
-                   </div>
                 </div>
 
                 {/* Info Clientes (Espelhado Formulario) */}
