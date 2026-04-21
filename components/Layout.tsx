@@ -126,7 +126,7 @@ const Layout: React.FC = () => {
               <img src="/logo.png" alt="Motta Logo" className="max-w-full max-h-full object-contain" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
               <span className="material-symbols-outlined text-primary hidden text-3xl">auto_awesome</span>
             </div>
-            {!sidebarCollapsed && <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white uppercase hidden md:block">FreelanceOS</h1>}
+            {!sidebarCollapsed && <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white uppercase hidden md:block">STUDIO MOTA</h1>}
           </div>
           <button className="md:hidden text-slate-500" onClick={() => setMobileMenuOpen(false)}>
             <span className="material-symbols-outlined">close</span>
