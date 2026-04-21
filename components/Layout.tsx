@@ -110,8 +110,9 @@ const Layout: React.FC = () => {
     { path: '/clientes', icon: 'group', label: 'Clientes' },
     { path: '/notas', icon: 'sticky_note_2', label: 'Notas' },
     { path: '/senhas', icon: 'lock', label: 'Senhas' },
+    { path: '/arquivos', icon: 'folder', label: 'Arquivos' },
   ];
-
+  
   const handleAction = (msg: string) => {
     alert(msg);
   };
@@ -121,12 +122,11 @@ const Layout: React.FC = () => {
       {/* Sidebar Navigation */}
       <aside className={`${sidebarCollapsed ? 'w-[72px]' : 'w-64'} flex-shrink-0 border-r border-primary/10 bg-white dark:bg-surface-dark flex flex-col z-30 shadow-xl shadow-black/5 absolute inset-y-0 left-0 transform transition-all duration-300 md:relative md:translate-x-0 ${mobileMenuOpen ? 'translate-x-0 !w-64' : '-translate-x-full'}`}>
         <div className={`p-6 flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'} gap-3`}>
-          <div className="flex items-center gap-3">
-            <div className="size-10 flex items-center justify-center shrink-0">
-              <img src="/logo.png" alt="Motta Logo" className="max-w-full max-h-full object-contain" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
+          <div className="flex items-center w-full">
+            <div className={`flex items-center justify-start shrink-0 transition-all ${sidebarCollapsed ? 'w-10' : 'w-32'} h-10`}>
+              <img src="/logo.png" alt="Motta Logo" className="w-full h-full object-contain origin-left" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
               <span className="material-symbols-outlined text-primary hidden text-3xl">auto_awesome</span>
             </div>
-            {!sidebarCollapsed && <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white uppercase hidden md:block">STUDIO MOTA</h1>}
           </div>
           <button className="md:hidden text-slate-500" onClick={() => setMobileMenuOpen(false)}>
             <span className="material-symbols-outlined">close</span>

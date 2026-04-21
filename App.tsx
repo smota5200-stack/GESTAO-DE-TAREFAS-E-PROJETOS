@@ -17,6 +17,7 @@ import Onboarding from './pages/Onboarding';
 import Kanban from './pages/Kanban';
 import Reports from './pages/Reports';
 import Orcamentos from './pages/Orcamentos';
+import Files from './pages/Files';
 
 
 const App: React.FC = () => {
@@ -36,6 +37,7 @@ const App: React.FC = () => {
           <Route path="clientes/:id" element={<ClientDetails />} />
           <Route path="notas" element={<Notes />} />
           <Route path="senhas" element={<Passwords />} />
+          <Route path="arquivos" element={<Files />} />
           <Route path="configuracoes" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

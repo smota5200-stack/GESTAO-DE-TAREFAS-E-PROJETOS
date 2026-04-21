@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
 const Settings: React.FC = () => {
@@ -12,6 +12,18 @@ const Settings: React.FC = () => {
     const [userName, setUserName] = useState('Sergio Mota');
     const [userRole, setUserRole] = useState('Administrador');
     const [userAvatar, setUserAvatar] = useState('https://ui-avatars.com/api/?name=Sergio+Mota&background=bcd200&color=171717');
+    const [userEmail, setUserEmail] = useState('smota5200@gmail.com');
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => setUserAvatar(reader.result as string);
+            reader.readAsDataURL(file);
+        }
+    };
     
     // UI state
     const [activeTab, setActiveTab] = useState<'geral' | 'integracoes'>('integracoes');
@@ -226,49 +238,67 @@ const Settings: React.FC = () => {
             )}
 
             {activeTab === 'geral' && (
-                <form onSubmit={handleSave} className="space-y-6">
-                    <div className="bg-white dark:bg-surface-dark rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm overflow-hidden p-6 space-y-6">
-                        <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-white/5">
-                            <div className="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-                                <span className="material-symbols-outlined">person</span>
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-slate-900 dark:text-white">Perfil do Usuário</h3>
-                                <p className="text-xs text-slate-500">Credenciais que aparecem no seu menu lateral.</p>
+                <form onSubmit={handleSave} className="space-y-12 animate-in fade-in">
+                    {/* Avatar Upload */}
+                    <div className="flex items-center gap-6 pb-8 border-b border-slate-200 dark:border-white/5">
+                        <div 
+                            className="size-[90px] shrink-0 rounded-full bg-slate-200 dark:bg-black/50 border-2 border-primary/20 overflow-hidden bg-cover bg-center shadow-lg" 
+                            style={{ backgroundImage: `url('${userAvatar || 'https://ui-avatars.com/api/?name='+userName}')` }}
+                        ></div>
+                        <div>
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Escolha sua foto de perfil</h3>
+                            <p className="text-xs text-slate-500 mb-4 font-medium">Caso você não escolha uma foto de perfil, mostraremos suas iniciais.</p>
+                            <div className="flex gap-4 items-center">
+                                <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageUpload} className="hidden" />
+                                <button type="button" onClick={() => fileInputRef.current?.click()} className="px-4 py-2 border border-slate-200 dark:border-white/10 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-slate-700 dark:text-slate-200 bg-white dark:bg-black/20 shadow-sm">
+                                    <span className="material-symbols-outlined text-[18px]">upload</span> Escolher foto
+                                </button>
+                                <button type="button" onClick={() => setUserAvatar('')} className="text-xs font-bold text-blue-500 hover:text-blue-600 transition-colors">Excluir</button>
                             </div>
                         </div>
+                    </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400">Seu Nome</label>
-                                <input
-                                    type="text"
-                                    value={userName}
-                                    onChange={(e) => setUserName(e.target.value)}
-                                    className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/50 text-slate-900 dark:text-white"
-                                    placeholder="Ex: Sergio Mota"
-                                />
+                    {/* Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 lg:gap-8">
+                        {/* Col 1 */}
+                        <div className="space-y-6">
+                            <h4 className="font-bold text-[15px] text-slate-900 dark:text-white">Informações pessoais</h4>
+                            <div className="space-y-2 text-left">
+                                <label className="block text-xs font-bold text-slate-900 dark:text-white">Nome</label>
+                                <input type="text" value={userName} onChange={(e) => setUserName(e.target.value)} className="w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/50 text-slate-900 dark:text-white" />
                             </div>
-                            <div className="space-y-2">
-                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400">Cargo / Título</label>
-                                <input
-                                    type="text"
-                                    value={userRole}
-                                    onChange={(e) => setUserRole(e.target.value)}
-                                    className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/50 text-slate-900 dark:text-white"
-                                    placeholder="Ex: Administrador"
-                                />
+                            <div className="space-y-2 text-left">
+                                <label className="block text-xs font-bold text-slate-400">Email</label>
+                                <input type="email" value={userEmail} disabled className="w-full bg-slate-50 dark:bg-black/40 border-none rounded-xl px-4 py-2.5 text-sm text-slate-400 cursor-not-allowed" />
                             </div>
-                            <div className="space-y-2 md:col-span-2">
-                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400">URL do Avatar</label>
-                                <input
-                                    type="url"
-                                    value={userAvatar}
-                                    onChange={(e) => setUserAvatar(e.target.value)}
-                                    className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/50 text-slate-900 dark:text-white"
-                                    placeholder="https://..."
-                                />
-                                <p className="text-xs text-slate-500 mt-1">Cole aqui o link da sua foto (dica: utilize ui-avatars.com para letras ou envie para um ImageHost).</p>
+                            {/* Hidden userRole field kept logic-wise to not break Layout */}
+                            <input type="hidden" value={userRole} />
+                        </div>
+                        
+                        {/* Col 2 */}
+                        <div className="space-y-6 lg:border-l lg:border-slate-200 lg:dark:border-white/5 lg:pl-8">
+                            <h4 className="font-bold text-[15px] text-slate-900 dark:text-white">Senha</h4>
+                            <button type="button" className="px-4 py-2 border border-slate-200 dark:border-white/10 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-slate-700 dark:text-slate-200 bg-white dark:bg-black/20 shadow-sm">
+                                Alterar senha
+                            </button>
+                        </div>
+
+                        {/* Col 3 */}
+                        <div className="space-y-6 lg:border-l lg:border-slate-200 lg:dark:border-white/5 lg:pl-8">
+                            <h4 className="font-bold text-[15px] text-slate-900 dark:text-white">Sistema</h4>
+                            <div className="space-y-2 text-left">
+                                <label className="block text-xs font-bold text-slate-900 dark:text-white">Idioma</label>
+                                <select className="w-full max-w-[200px] bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/50 text-slate-900 dark:text-white font-medium">
+                                    <option>Português</option>
+                                    <option>Inglês</option>
+                                </select>
+                            </div>
+                            <div className="pt-4 text-left">
+                                <p className="text-xs font-bold text-slate-900 dark:text-white mb-2">Versão da Plataforma</p>
+                                <p className="text-xs font-medium text-slate-600 dark:text-slate-400 flex items-center gap-2">
+                                    10/11/2026, 12:00
+                                    <span className="text-emerald-500 flex items-center gap-1"><span className="material-symbols-outlined text-[14px] font-bold">check</span> Atualizado</span>
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -279,7 +309,7 @@ const Settings: React.FC = () => {
                         </div>
                     )}
 
-                    <div className="flex justify-end pt-2">
+                    <div className="flex justify-start pt-8">
                         <button
                             type="submit"
                             disabled={saving}
@@ -290,7 +320,7 @@ const Settings: React.FC = () => {
                             ) : (
                                 <span className="material-symbols-outlined text-sm">save</span>
                             )}
-                            Salvar Perfil
+                            Salvar Alterações
                         </button>
                     </div>
                 </form>
