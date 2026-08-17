@@ -10,6 +10,8 @@ interface KanbanTask {
   projectName: string;
   dueDate: string;
   kanbanStatus: KanbanStatus;
+  origem?: string;
+  specs?: string;
 }
 
 const Kanban: React.FC = () => {
@@ -42,7 +44,7 @@ const Kanban: React.FC = () => {
     // Fetch demands
     const { data: demands } = await supabase
       .from('project_demands')
-      .select('id, title, project_id, due_date, work_status');
+      .select('id, title, project_id, due_date, work_status, description, briefing_resumo');
 
     // Fetch projects to get names
     const { data: projects } = await supabase.from('projects').select('id, title');
@@ -66,7 +68,9 @@ const Kanban: React.FC = () => {
           projectId: d.project_id,
           projectName: projMap[d.project_id] || 'Projeto Desconhecido',
           dueDate: d.due_date,
-          kanbanStatus: status
+          kanbanStatus: status,
+          origem: (d.description || '').split(' || ')[0] || undefined,
+          specs: d.briefing_resumo || undefined
         };
       });
       setTasks(mappedTasks);
@@ -152,7 +156,26 @@ const Kanban: React.FC = () => {
                       <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-tight pr-4">{task.title}</h4>
                       <span className="material-symbols-outlined text-[14px] text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity">drag_indicator</span>
                     </div>
-                    <p className="text-[11px] font-medium text-slate-500 mb-3 truncate">{task.projectName}</p>
+                    <p className="text-[11px] font-medium text-slate-500 mb-2 truncate">{task.projectName}</p>
+                    {task.origem && (
+                      <span className="inline-block text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 mb-2 rounded bg-primary/15 text-primary">
+                        {task.origem}
+                      </span>
+                    )}
+                    {task.specs && (
+                      <ul className="mb-3 space-y-0.5">
+                        {task.specs.split('\n').map((linha, idx) => {
+                          const [rot, ...resto] = linha.split(':');
+                          const valor = resto.join(':').trim();
+                          if (!valor || valor === '-') return null;
+                          return (
+                            <li key={idx} className="text-[10px] leading-snug text-slate-600 dark:text-slate-400">
+                              <span className="font-semibold text-slate-500 dark:text-slate-500">{rot}:</span> {valor}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
                     <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-100 dark:border-white/5">
                       <div className="flex -space-x-1">
                         <div className="size-6 rounded-full bg-slate-200 dark:bg-black/30 border border-white dark:border-surface-dark flex items-center justify-center text-[8px] font-bold text-slate-500">
