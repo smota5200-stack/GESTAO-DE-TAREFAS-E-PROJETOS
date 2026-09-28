@@ -60,6 +60,7 @@ export function useClients() {
                 const savedClient = mapRow(row);
                 return {
                     ...savedClient,
+                    cpfCnpj: savedClient.cpfCnpj || localClients.get(savedClient.id)?.cpfCnpj || '',
                     contractUrl: savedClient.contractUrl || localClients.get(savedClient.id)?.contractUrl || ''
                 };
             }));
@@ -97,7 +98,6 @@ export function useClients() {
             company: client.company,
             email: client.email,
             phone: client.phone,
-            cpf_cnpj: client.cpfCnpj || '',
             notes: client.notes,
             status: 'Ativo',
             total_spent: 0
@@ -117,7 +117,11 @@ export function useClients() {
             return newClient;
         }
 
-        const saved = { ...mapRow(result.data), contractUrl: client.contractUrl || '' };
+        const saved = {
+            ...mapRow(result.data),
+            cpfCnpj: client.cpfCnpj || '',
+            contractUrl: client.contractUrl || ''
+        };
         const next = [saved, ...getLocalClients().filter(item => item.id !== saved.id)];
         saveLocalClients(next);
         setClients(prev => [saved, ...prev.filter(item => item.id !== saved.id)]);
