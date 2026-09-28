@@ -61,7 +61,8 @@ export function useClients() {
                 return {
                     ...savedClient,
                     cpfCnpj: savedClient.cpfCnpj || localClients.get(savedClient.id)?.cpfCnpj || '',
-                    contractUrl: savedClient.contractUrl || localClients.get(savedClient.id)?.contractUrl || ''
+                    contractUrl: savedClient.contractUrl || localClients.get(savedClient.id)?.contractUrl || '',
+                    notes: savedClient.notes || localClients.get(savedClient.id)?.notes || ''
                 };
             }));
         }
@@ -93,19 +94,35 @@ export function useClients() {
             return newClient;
         }
 
-        const payload = {
+        const payload: Record<string, string | number> = {
             name: client.name,
             company: client.company,
             email: client.email,
             phone: client.phone,
+            cpf_cnpj: client.cpfCnpj || '',
+            contract_url: client.contractUrl || '',
+            status: 'Ativo',
+            total_spent: 0,
             notes: client.notes
         };
 
-        const result = await supabase
+        let result = await supabase
             .from('clients')
             .insert(payload)
             .select()
             .single();
+
+        const optionalColumns = new Set(['cpf_cnpj', 'contract_url', 'status', 'total_spent', 'notes']);
+        while (result.error?.code === 'PGRST204') {
+            const missingColumn = result.error.message.match(/Could not find the '([^']+)' column of 'clients'/)?.[1];
+            if (!missingColumn || !optionalColumns.has(missingColumn) || !(missingColumn in payload)) break;
+            delete payload[missingColumn];
+            result = await supabase
+                .from('clients')
+                .insert(payload)
+                .select()
+                .single();
+        }
 
         if (result.error) {
             console.warn('Falha ao salvar no Supabase; salvando localmente:', result.error);
@@ -118,7 +135,8 @@ export function useClients() {
         const saved = {
             ...mapRow(result.data),
             cpfCnpj: client.cpfCnpj || '',
-            contractUrl: client.contractUrl || ''
+            contractUrl: client.contractUrl || '',
+            notes: client.notes || ''
         };
         const next = [saved, ...getLocalClients().filter(item => item.id !== saved.id)];
         saveLocalClients(next);

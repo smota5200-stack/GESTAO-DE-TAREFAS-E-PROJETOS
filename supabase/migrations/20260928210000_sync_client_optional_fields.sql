@@ -1,0 +1,6 @@
+ALTER TABLE public.clients
+    ADD COLUMN IF NOT EXISTS cpf_cnpj TEXT NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS contract_url TEXT NOT NULL DEFAULT '',
+    ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'Ativo'
+        CHECK (status IN ('Ativo', 'Inativo')),
+    ADD COLUMN IF NOT EXISTS total_spent NUMERIC(12, 2) NOT NULL DEFAULT 0;
