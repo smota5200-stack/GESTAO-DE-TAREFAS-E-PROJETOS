@@ -97,7 +97,8 @@ export function useClients() {
             name: client.name,
             company: client.company,
             email: client.email,
-            phone: client.phone
+            phone: client.phone,
+            notes: client.notes
         };
 
         const result = await supabase
