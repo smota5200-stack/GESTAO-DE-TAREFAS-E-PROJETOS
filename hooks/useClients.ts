@@ -99,34 +99,15 @@ export function useClients() {
             phone: client.phone,
             cpf_cnpj: client.cpfCnpj || '',
             notes: client.notes,
-            contract_url: client.contractUrl || '',
             status: 'Ativo',
             total_spent: 0
         };
 
-        let result = await supabase
+        const result = await supabase
             .from('clients')
             .insert(payload)
             .select()
             .single();
-
-        if (result.error?.code === 'PGRST204' && result.error.message.includes("'contract_url' column")) {
-            const legacyPayload = {
-                name: payload.name,
-                company: payload.company,
-                email: payload.email,
-                phone: payload.phone,
-                cpf_cnpj: payload.cpf_cnpj,
-                notes: payload.notes,
-                status: payload.status,
-                total_spent: payload.total_spent
-            };
-            result = await supabase
-                .from('clients')
-                .insert(legacyPayload)
-                .select()
-                .single();
-        }
 
         if (result.error) {
             console.warn('Falha ao salvar no Supabase; salvando localmente:', result.error);
