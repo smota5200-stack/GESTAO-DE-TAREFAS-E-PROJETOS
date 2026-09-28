@@ -312,122 +312,109 @@ const Orcamentos: React.FC = () => {
         </div>
 
         {/* RIGHT COLUMN: PDF PREVIEW A4 Ratio */}
-        <div className="xl:col-span-7 bg-slate-300 rounded-2xl flex justify-center p-4 xl:p-8 overflow-y-auto custom-scrollbar h-full shadow-inner relative">
-           
-           {/* Scale the A4 preview depending on screen, using fixed aspect logic */}
-           <div className="bg-white w-full max-w-[800px] min-h-[1050px] shadow-2xl shadow-black/20 flex flex-col font-sans" ref={pdfRef}>
-              
-              {/* === DARK HEADER BLOCK === */}
-              <div className="bg-[#0B1120] text-slate-200 px-8 py-10 shadow-md relative overflow-hidden">
-                <div className="flex justify-between items-start mb-12">
-                   
-                   <div className="flex items-center gap-4">
-                      {/* LOGO GIGANTE Area */}
-                      <div className="w-24 h-24 bg-white rounded-2xl p-2 flex items-center justify-center shadow-lg shadow-black/30">
-                        <img src="/logo.png" alt="Logo Motta" className="max-w-full max-h-full object-contain" />
-                      </div>
-                      <div>
-                        <h2 className="text-2xl font-black text-white tracking-widest uppercase">Proposta Comercial</h2>
-                        <p className="text-xs text-slate-400 mt-1 font-mono">Ref: {randomRef}</p>
-                      </div>
-                   </div>
+        <div className="xl:col-span-7 bg-slate-200 rounded-2xl flex justify-center p-4 xl:p-8 overflow-y-auto custom-scrollbar h-full shadow-inner relative">
+          <div className="bg-white w-full max-w-[800px] min-h-[1050px] shadow-xl border border-slate-200 flex flex-col font-sans" ref={pdfRef}>
+            <div className="px-8 py-8 border-b border-slate-200">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-xl bg-slate-100 border border-slate-200 p-2 flex items-center justify-center">
+                    <img src="/logo.png" alt="Logo Studio Mota" className="max-w-full max-h-full object-contain" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500">Studio Mota</p>
+                    <h2 className="text-2xl font-black text-slate-900">Proposta Comercial</h2>
+                  </div>
                 </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Ref.</p>
+                  <p className="text-sm font-bold text-slate-800">{randomRef}</p>
+                </div>
+              </div>
+            </div>
 
-                {/* Info Clientes (Espelhado Formulario) */}
-                <div className="grid grid-cols-4 gap-6 text-[11px]">
-                  {/* Left Col */}
-                  <div className="col-span-1 border-l-2 border-primary/50 pl-3">
-                     <p className="font-bold text-white text-sm whitespace-pre-wrap">{contactName || 'Nome do Contato'}</p>
-                     <p className="text-slate-400 mt-1">{phone || '(00) 00000-0000'}</p>
+            <div className="px-8 py-6 border-b border-slate-200 bg-slate-50/70">
+              <div className="grid grid-cols-2 gap-5 text-[11px] text-slate-600">
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">Contato</p>
+                    <p className="text-sm font-bold text-slate-900">{contactName || 'Nome do cliente'}</p>
                   </div>
-                  
-                  {/* Middle Cols */}
-                  <div className="col-span-2 grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-slate-500 font-bold tracking-wider mb-0.5">EMPRESA</p>
-                      <p className="font-medium text-slate-200 truncate">{company || 'NÃO INFORMADO'}</p>
-                      <div className="mt-4">
-                        <p className="text-slate-500 font-bold tracking-wider mb-0.5">TELEFONE</p>
-                        <p className="font-medium text-slate-200">{phone || 'NÃO INFORMADO'}</p>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-slate-500 font-bold tracking-wider mb-0.5">CONTATO</p>
-                      <p className="font-medium text-slate-200 truncate">{contactName || 'NÃO INFORMADO'}</p>
-                      <div className="mt-4">
-                        <p className="text-slate-500 font-bold tracking-wider mb-0.5">EMAIL</p>
-                        <p className="font-medium text-slate-200 truncate">{email || 'NÃO INFORMADO'}</p>
-                      </div>
-                    </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">Empresa</p>
+                    <p className="text-sm font-medium text-slate-700">{company || 'Empresa não informada'}</p>
                   </div>
-
-                  {/* Right Col */}
-                  <div className="col-span-1 text-right">
-                     <p className="text-slate-500 font-bold tracking-wider mb-0.5">Data</p>
-                     <p className="font-medium text-slate-200">{formatDatePTBR(proposalDate)}</p>
+                </div>
+                <div className="space-y-2 text-right">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">Data</p>
+                    <p className="text-sm font-medium text-slate-700">{formatDatePTBR(proposalDate)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">Telefone</p>
+                    <p className="text-sm font-medium text-slate-700">{phone || '(00) 00000-0000'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">E-mail</p>
+                    <p className="text-sm font-medium text-slate-700 break-all">{email || 'email@cliente.com'}</p>
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* === BODY BLOCK === */}
-              <div className="flex-1 px-10 py-10 flex flex-col">
-                 
-                 {/* Table of Items */}
-                 <table className="w-full text-left border-collapse text-xs">
-                   <thead>
-                     <tr className="border-b-2 border-slate-200 text-slate-500">
-                       <th className="py-3 font-bold uppercase w-1/2">Descrição</th>
-                       <th className="py-3 font-bold text-center uppercase">Qtde</th>
-                       <th className="py-3 font-bold text-right uppercase">Unitário</th>
-                       <th className="py-3 font-bold text-right uppercase">Total</th>
-                       <th className="py-3 font-bold text-right uppercase">Garantia</th>
-                     </tr>
-                   </thead>
-                   <tbody>
-                     {items.length === 0 ? (
-                       <tr>
-                         <td colSpan={5} className="py-12 text-center text-slate-400 italic">Adicione itens para montar a proposta.</td>
-                       </tr>
-                     ) : (
-                       items.map((item, i) => (
-                         <tr key={i} className="border-b border-slate-100/50">
-                           <td className="py-4 font-bold text-slate-800 break-words pr-2">{item.description || 'Item sem nome'}</td>
-                           <td className="py-4 text-center font-medium text-slate-600">{item.quantity}</td>
-                           <td className="py-4 text-right text-slate-600">R$ {Number(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                           <td className="py-4 text-right font-bold text-slate-800">R$ {(Number(item.quantity) * Number(item.unitPrice)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                           <td className="py-4 text-right text-slate-500 text-[10px]">{item.warranty}</td>
-                         </tr>
-                       ))
-                     )}
-                   </tbody>
-                 </table>
+            <div className="flex-1 px-8 py-6 flex flex-col">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-500">
+                    <th className="py-3 font-bold uppercase w-1/2">Descrição</th>
+                    <th className="py-3 font-bold text-center uppercase">Qtde</th>
+                    <th className="py-3 font-bold text-right uppercase">Unitário</th>
+                    <th className="py-3 font-bold text-right uppercase">Total</th>
+                    <th className="py-3 font-bold text-right uppercase">Garantia</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-12 text-center text-slate-400 italic">Adicione itens para montar a proposta.</td>
+                    </tr>
+                  ) : (
+                    items.map((item, i) => (
+                      <tr key={i} className="border-b border-slate-100">
+                        <td className="py-4 pr-2 font-bold text-slate-800 break-words">{item.description || 'Item sem nome'}</td>
+                        <td className="py-4 text-center text-slate-600">{item.quantity}</td>
+                        <td className="py-4 text-right text-slate-600">R$ {Number(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                        <td className="py-4 text-right font-bold text-slate-900">R$ {(Number(item.quantity) * Number(item.unitPrice)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                        <td className="py-4 text-right text-slate-500 text-[10px]">{item.warranty}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
 
-                 <div className="mt-auto pt-8 flex flex-col items-end">
-                   {/* Total Block */}
-                   <div className="bg-slate-50 border border-slate-200 rounded-2xl w-64 p-6 text-right mb-8">
-                     <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Total Geral</p>
-                     <p className="text-3xl font-black text-blue-600 tracking-tight">R$ {calculateTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                   </div>
+              <div className="mt-auto pt-8 flex items-end justify-between gap-6">
+                <div className="flex-1 space-y-3">
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500 mb-2">Pagamento</p>
+                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{paymentTerms || 'À combinar'}</p>
+                  </div>
+                  {observations && (
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500 mb-2">Observações</p>
+                      <p className="text-sm text-slate-700 whitespace-pre-wrap">{observations}</p>
+                    </div>
+                  )}
+                </div>
 
-                   {/* Footer Info Blocks */}
-                   <div className="w-full grid grid-cols-2 gap-4">
-                     <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-5">
-                       <p className="text-[#c78822] text-xs font-bold uppercase tracking-wider mb-2">Pagamento</p>
-                       <p className="text-slate-800 text-sm font-medium whitespace-pre-wrap">{paymentTerms}</p>
-                     </div>
-                     <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
-                       <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Validade</p>
-                       <p className="text-slate-800 text-sm font-medium">{validityDays} dias</p>
-                       {observations && (
-                         <p className="text-slate-500 mt-2 text-xs border-t border-slate-200 pt-2 break-words">{observations}</p>
-                       )}
-                     </div>
-                   </div>
-
-                 </div>
-
+                <div className="w-64 bg-slate-900 text-white rounded-xl p-5">
+                  <div className="flex justify-between text-xs uppercase tracking-[0.15em] text-slate-300 pb-2 border-b border-white/10">
+                    <span>Total</span>
+                    <span>{validityDays} dias</span>
+                  </div>
+                  <p className="mt-4 text-3xl font-black tracking-tight">R$ {calculateTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                </div>
               </div>
-           </div>
+            </div>
+          </div>
         </div>
 
       </div>
