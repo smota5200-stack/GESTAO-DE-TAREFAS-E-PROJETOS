@@ -55,7 +55,14 @@ export function useClients() {
             console.warn('Supabase indisponível; usando fallback local:', error);
             setClients(getLocalClients());
         } else {
-            setClients((data || []).map(mapRow));
+            const localClients = new Map(getLocalClients().map(client => [client.id, client]));
+            setClients((data || []).map(row => {
+                const savedClient = mapRow(row);
+                return {
+                    ...savedClient,
+                    contractUrl: savedClient.contractUrl || localClients.get(savedClient.id)?.contractUrl || ''
+                };
+            }));
         }
         setLoading(false);
     }, []);
@@ -85,31 +92,51 @@ export function useClients() {
             return newClient;
         }
 
-        const { data, error } = await supabase
+        const payload = {
+            name: client.name,
+            company: client.company,
+            email: client.email,
+            phone: client.phone,
+            cpf_cnpj: client.cpfCnpj || '',
+            notes: client.notes,
+            contract_url: client.contractUrl || '',
+            status: 'Ativo',
+            total_spent: 0
+        };
+
+        let result = await supabase
             .from('clients')
-            .insert({
-                name: client.name,
-                company: client.company,
-                email: client.email,
-                phone: client.phone,
-                cpf_cnpj: client.cpfCnpj || '',
-                notes: client.notes,
-                contract_url: client.contractUrl || '',
-                status: 'Ativo',
-                total_spent: 0
-            })
+            .insert(payload)
             .select()
             .single();
 
-        if (error) {
-            console.warn('Falha ao salvar no Supabase; salvando localmente:', error);
+        if (result.error?.code === 'PGRST204' && result.error.message.includes("'contract_url' column")) {
+            const legacyPayload = {
+                name: payload.name,
+                company: payload.company,
+                email: payload.email,
+                phone: payload.phone,
+                cpf_cnpj: payload.cpf_cnpj,
+                notes: payload.notes,
+                status: payload.status,
+                total_spent: payload.total_spent
+            };
+            result = await supabase
+                .from('clients')
+                .insert(legacyPayload)
+                .select()
+                .single();
+        }
+
+        if (result.error) {
+            console.warn('Falha ao salvar no Supabase; salvando localmente:', result.error);
             const next = [newClient, ...getLocalClients()];
             saveLocalClients(next);
             setClients(next);
             return newClient;
         }
 
-        const saved = mapRow(data);
+        const saved = { ...mapRow(result.data), contractUrl: client.contractUrl || '' };
         const next = [saved, ...getLocalClients().filter(item => item.id !== saved.id)];
         saveLocalClients(next);
         setClients(prev => [saved, ...prev.filter(item => item.id !== saved.id)]);
