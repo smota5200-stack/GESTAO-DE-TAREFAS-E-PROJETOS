@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useClients } from '../hooks/useClients';
 import { useNotasFiscais } from '../hooks/useNotasFiscais';
 import { ServiceInvoice } from '../types';
+import { ActionToolbar, Toast, useToast } from '../components/ActionToolbar';
+import { elementToPdf, saveToDrive, getDriveFolder, downloadBlob, DriveFile } from '../lib/driveFolder';
 import {
   NFSE_PORTAL_URL, ParsedNfse, emptyParsed, parseNfseXml, parseNfsePdf, parseNfseLink,
   buildNfseUrl, formatDoc, onlyDigits, nfseBaseName, nfseFolder, openExternal,
@@ -27,6 +29,10 @@ const NotasFiscais: React.FC = () => {
   const [year, setYear] = useState<string>(String(new Date().getFullYear()));
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [busy, setBusy] = useState<'save' | 'pdf' | 'drive' | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const reportRef = useRef<HTMLDivElement>(null);
+  const { toast, show } = useToast();
 
   const clientName = (id?: string) => {
     const c = clients.find(cl => cl.id === id);
@@ -86,24 +92,149 @@ const NotasFiscais: React.FC = () => {
     try { await deleteInvoice(inv); } catch (e: any) { alert(e.message); }
   };
 
-  return (
-    <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500">
-      {/* Cabeçalho */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-1">Financeiro</p>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">Notas Fiscais</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">NFS-e emitidas na Prefeitura de São Paulo, organizadas por mês.</p>
+  const periodLabel = year === 'todos' ? 'Todos os anos' : year;
+  const reportName = `Relatorio NFS-e ${year === 'todos' ? 'geral' : year}${search ? ' (filtrado)' : ''}.pdf`;
+
+  const clearFilters = () => { setSearch(''); setYear(String(new Date().getFullYear())); setCollapsed({}); };
+
+  const downloadReport = async () => {
+    if (!reportRef.current) return;
+    setBusy('pdf');
+    try {
+      downloadBlob(await elementToPdf(reportRef.current, reportName), reportName);
+    } catch (e: any) {
+      show({ type: 'error', text: `Não consegui gerar o PDF: ${e.message}` });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** Copia PDF/XML das notas filtradas + relatório para a pasta do Drive (ano/mês) */
+  const copyToDrive = async () => {
+    setBusy('drive');
+    try {
+      const files: DriveFile[] = [];
+      for (const inv of filtered) {
+        const [y, m] = nfseFolder(inv.issueDate).split('/');
+        const base = nfseBaseName({ invoiceNumber: inv.invoiceNumber, takerName: inv.takerName || clientName(inv.clientId) });
+        for (const [path, ext] of [[inv.filePath, 'pdf'], [inv.xmlPath, 'xml']] as const) {
+          if (!path) continue;
+          const blob = await fetch(await fileUrl(path)).then(r => r.blob());
+          files.push({ subfolders: [y, m], name: `${base}.${ext}`, blob });
+        }
+      }
+      if (reportRef.current) {
+        files.push({ subfolders: year === 'todos' ? [] : [year], name: reportName, blob: await elementToPdf(reportRef.current, reportName) });
+      }
+      const r = await saveToDrive('notas', files, { skipExisting: false });
+      if (r.mode === 'drive') show({ type: 'ok', text: `Drive atualizado em "${r.folder}": ${r.written} arquivo(s) gravado(s), organizados por ano/mês.` });
+      else if (r.mode === 'download') show({ type: 'info', text: 'Seu navegador não grava em pastas — os arquivos foram baixados.' });
+    } catch (e: any) {
+      show({ type: 'error', text: `Não consegui copiar para o Drive: ${e.message}` });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** Ao importar: se a pasta do Drive já foi escolhida, guarda uma cópia lá também */
+  const autoCopyToDrive = async (items: { data: ParsedNfse }[]) => {
+    if (!(await getDriveFolder('notas'))) return;
+    const files: DriveFile[] = [];
+    items.forEach(({ data }) => {
+      const [y, m] = nfseFolder(data.issueDate).split('/');
+      const base = nfseBaseName(data);
+      if (data.pdfFile) files.push({ subfolders: [y, m], name: `${base}.pdf`, blob: data.pdfFile });
+      if (data.xmlContent) files.push({ subfolders: [y, m], name: `${base}.xml`, blob: new Blob([data.xmlContent], { type: 'application/xml' }) });
+    });
+    if (!files.length) return;
+    try {
+      const r = await saveToDrive('notas', files);
+      if (r.mode === 'drive') show({ type: 'ok', text: `Nota guardada no app e copiada para o Drive (${r.folder}).` });
+    } catch {
+      show({ type: 'info', text: 'Nota guardada no app. Clique em "Salvar no Google Drive" para copiar para a pasta.' });
+    }
+  };
+
+  const reportTotal = filtered.filter(i => i.status !== 'cancelada').reduce((a, i) => a + i.amount, 0);
+  const reportDoc = (
+    <div ref={reportRef} className="bg-white text-slate-800" style={{ width: 794, minHeight: 1123, fontFamily: 'Inter, sans-serif' }}>
+      <div className="h-2" style={{ background: '#bcd200' }} />
+      <div className="px-12 pt-10 pb-6 flex justify-between items-start">
+        <div className="flex items-center gap-3">
+          <img src="/logo.png" alt="Studio Mota" className="h-10 w-auto" />
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-400">Studio Mota</p>
+            <h1 className="text-[22px] font-black text-slate-900 leading-tight">Relatório de Notas Fiscais</h1>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => setImportOpen(true)} className="h-10 px-4 text-sm font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/10 rounded-xl hover:border-primary flex items-center gap-2 transition-colors">
-            <span className="material-symbols-outlined text-[18px]">upload_file</span> Importar nota
-          </button>
-          <button onClick={() => openExternal(NFSE_PORTAL_URL)} className="h-10 px-5 text-sm font-bold text-slate-900 bg-primary rounded-xl hover:brightness-95 shadow-lg shadow-primary/20 flex items-center gap-2">
-            <span className="material-symbols-outlined text-[18px]">open_in_new</span> Emitir na Prefeitura
-          </button>
+        <div className="text-right text-[11px] text-slate-500">
+          <p className="font-semibold text-slate-800">{periodLabel}</p>
+          {search && <p>Filtro: “{search}”</p>}
+          <p>Gerado em {new Date().toLocaleDateString('pt-BR')}</p>
         </div>
       </div>
+      <div className="px-12 grid grid-cols-3 gap-4 mb-6">
+        {[{ l: 'Notas válidas', v: String(filtered.filter(i => i.status !== 'cancelada').length) }, { l: 'Canceladas', v: String(filtered.filter(i => i.status === 'cancelada').length) }, { l: 'Total emitido', v: brl(reportTotal) }].map(k => (
+          <div key={k.l} className="border-l-2 pl-3" style={{ borderColor: '#bcd200' }}>
+            <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-slate-400">{k.l}</p>
+            <p className="text-[18px] font-black text-slate-900 tabular-nums">{k.v}</p>
+          </div>
+        ))}
+      </div>
+      <div className="px-12 pb-12">
+        <table className="w-full text-[10.5px] border-collapse">
+          <thead>
+            <tr className="text-[9px] uppercase tracking-[0.12em] text-slate-400 border-b-2 border-slate-900">
+              <th className="text-left py-2 font-semibold">Nº</th>
+              <th className="text-left py-2 font-semibold">Emissão</th>
+              <th className="text-left py-2 font-semibold">Tomador</th>
+              <th className="text-left py-2 font-semibold">CPF/CNPJ</th>
+              <th className="text-right py-2 font-semibold">Valor</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr><td colSpan={5} className="py-10 text-center text-slate-400 italic">Nenhuma nota no período.</td></tr>
+            ) : filtered.map(inv => (
+              <tr key={inv.id} className="border-b border-slate-200">
+                <td className="py-2 tabular-nums font-semibold">{inv.invoiceNumber}</td>
+                <td className="py-2 tabular-nums">{dateBR(inv.issueDate)}</td>
+                <td className="py-2 pr-2">{inv.takerName || clientName(inv.clientId) || '—'}{inv.status === 'cancelada' && <span className="ml-1 text-red-500 font-bold">(cancelada)</span>}</td>
+                <td className="py-2 tabular-nums">{inv.takerDoc ? formatDoc(inv.takerDoc) : '—'}</td>
+                <td className={`py-2 text-right tabular-nums font-semibold ${inv.status === 'cancelada' ? 'line-through text-slate-400' : ''}`}>{brl(inv.amount)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr><td colSpan={4} className="pt-4 text-right text-[9px] font-semibold uppercase tracking-[0.2em] text-slate-500">Total</td><td className="pt-4 text-right text-[14px] font-black tabular-nums">{brl(reportTotal)}</td></tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
+      {/* Barra de ações */}
+      <ActionToolbar
+        title="Notas Fiscais"
+        subtitle="NFS-e emitidas na Prefeitura de São Paulo, organizadas por mês."
+        driveKey="notas"
+        saveLabel="Salvar nota"
+        onSave={() => setImportOpen(true)}
+        clearLabel="Limpar filtros"
+        onClear={clearFilters}
+        pdfLabel="Baixar relatório"
+        onPdf={downloadReport}
+        onDrive={copyToDrive}
+        onPreview={() => setReportOpen(true)}
+        busy={busy}
+        extra={
+          <button onClick={() => openExternal(NFSE_PORTAL_URL)} className="h-10 px-4 text-sm font-bold text-slate-900 bg-primary rounded-lg hover:brightness-95 flex items-center gap-2 whitespace-nowrap">
+            <span className="material-symbols-outlined text-[18px]">open_in_new</span> Emitir na Prefeitura
+          </button>
+        }
+      />
 
       {/* Fluxo de emissão */}
       <div className="rounded-2xl border border-slate-200 dark:border-white/5 bg-white dark:bg-surface-dark p-5 grid md:grid-cols-3 gap-4">
@@ -248,9 +379,27 @@ const NotasFiscais: React.FC = () => {
           onClose={() => setImportOpen(false)}
           onSave={async (notes) => {
             for (const n of notes) await saveInvoice(n.data, n.clientId);
+            autoCopyToDrive(notes);
           }}
         />
       )}
+
+      {/* Documento do relatório (fora da tela, usado para o PDF) */}
+      <div aria-hidden style={{ position: 'fixed', left: -10000, top: 0, pointerEvents: 'none' }}>{reportDoc}</div>
+
+      {reportOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm overflow-y-auto p-6 md:p-10" onClick={() => setReportOpen(false)}>
+          <div className="max-w-fit mx-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-end gap-2 mb-4">
+              <button onClick={downloadReport} className="h-10 px-4 text-sm font-bold text-emerald-900 bg-emerald-200 rounded-lg flex items-center gap-2"><span className="material-symbols-outlined text-[18px]">download</span> Baixar relatório</button>
+              <button onClick={() => setReportOpen(false)} className="h-10 w-10 rounded-lg bg-white/10 text-white hover:bg-white/20 flex items-center justify-center"><span className="material-symbols-outlined">close</span></button>
+            </div>
+            <div className="shadow-2xl" dangerouslySetInnerHTML={{ __html: reportRef.current?.outerHTML || '' }} />
+          </div>
+        </div>
+      )}
+
+      <Toast toast={toast} onClose={() => show(null)} />
     </div>
   );
 };

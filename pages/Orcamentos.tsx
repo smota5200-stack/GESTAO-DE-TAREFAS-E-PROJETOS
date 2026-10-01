@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect, useMemo, useLayoutEffect } from 'react';
 import { useClients } from '../hooks/useClients';
 import { usePriceTable } from '../hooks/usePriceTable';
+import { useBudgets } from '../hooks/useBudgets';
+import { ActionToolbar, Toast, useToast } from '../components/ActionToolbar';
+import { elementToPdf, saveToDrive } from '../lib/driveFolder';
 
 interface LineItem {
   id: string;
@@ -25,6 +28,7 @@ interface Draft {
   observations: string;
   discount: number;
   items: LineItem[];
+  savedId?: string;
 }
 
 const DRAFT_KEY = 'studio_mota_orcamento_rascunho';
@@ -109,6 +113,10 @@ const Orcamentos: React.FC = () => {
   const [draft, setDraft] = useState<Draft>(loadDraft);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [busy, setBusy] = useState<'save' | 'pdf' | 'drive' | null>(null);
+  const [savedOpen, setSavedOpen] = useState(false);
+  const { budgets, saveBudget, deleteBudget } = useBudgets();
+  const { toast, show } = useToast();
   const [previewOpen, setPreviewOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerSearch, setPickerSearch] = useState('');
@@ -189,21 +197,61 @@ const Orcamentos: React.FC = () => {
     .slice(0, 40);
 
   const newProposal = () => {
-    if (draft.items.length && !confirm('Começar um novo orçamento? O rascunho atual será apagado.')) return;
+    if ((draft.items.length || draft.company) && !confirm('Limpar o formulário e começar um novo orçamento?')) return;
     setDraft(emptyDraft());
+  };
+
+  const fileBase = () => {
+    const who = (draft.company || draft.contactName || 'Cliente').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9 ._-]/g, '').trim();
+    return `Proposta ${draft.ref} - ${who}`;
+  };
+
+  const handleSave = async () => {
+    setBusy('save');
+    try {
+      const id = await saveBudget(draft, total, validUntil);
+      setDraft(d => ({ ...d, savedId: id }));
+      show({ type: 'ok', text: `Orçamento ${draft.ref} salvo.` });
+    } catch (e: any) {
+      show({ type: 'error', text: `Não consegui salvar: ${e.message}` });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleDrive = async () => {
+    if (!pdfRef.current) return;
+    setBusy('drive');
+    try {
+      const blob = await elementToPdf(pdfRef.current, `${fileBase()}.pdf`, [A4_WIDTH, A4_HEIGHT]);
+      const [y, m] = (draft.proposalDate || todayISO()).split('-');
+      const r = await saveToDrive('orcamentos', [{ subfolders: [y, m], name: `${fileBase()}.pdf` }].map(f => ({ ...f, blob })));
+      if (r.mode === 'drive') show({ type: 'ok', text: `Salvo no Drive: ${r.folder} / ${y} / ${m} / ${fileBase()}.pdf` });
+      else if (r.mode === 'download') show({ type: 'info', text: 'Seu navegador não grava em pastas — o PDF foi baixado.' });
+    } catch (e: any) {
+      show({ type: 'error', text: `Não consegui salvar no Drive: ${e.message}` });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const openSaved = (b: { draft: any; id: string }) => {
+    setDraft({ ...emptyDraft(), ...b.draft, savedId: b.id });
+    setSavedOpen(false);
+    show({ type: 'info', text: `Orçamento ${b.draft.ref} aberto.` });
   };
 
   const generatePDF = async () => {
     if (!pdfRef.current) return;
     setIsGenerating(true);
+    setBusy('pdf');
     try {
       const html2pdf = (window as any).html2pdf;
-      const name = (draft.company || draft.contactName || 'Cliente').trim().replace(/\s+/g, '_');
       await html2pdf()
         .from(pdfRef.current)
         .set({
           margin: 0,
-          filename: `Proposta_${draft.ref}_${name}.pdf`,
+          filename: `${fileBase()}.pdf`,
           image: { type: 'jpeg', quality: 0.98 },
           html2canvas: { scale: 2, useCORS: true, logging: false },
           jsPDF: { unit: 'px', format: [A4_WIDTH, A4_HEIGHT], orientation: 'portrait', hotfixes: ['px_scaling'] },
@@ -215,6 +263,7 @@ const Orcamentos: React.FC = () => {
       alert('Houve um problema ao exportar o PDF.');
     } finally {
       setIsGenerating(false);
+      setBusy(null);
     }
   };
 
@@ -349,37 +398,57 @@ const Orcamentos: React.FC = () => {
 
   return (
     <div className="max-w-[1600px] mx-auto flex flex-col gap-6 animate-in fade-in duration-500 xl:h-[calc(100vh-6rem)]">
-      {/* Cabeçalho da página */}
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 shrink-0">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-1">Orçamentos</p>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">Nova proposta</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
+      {/* Barra de ações */}
+      <ActionToolbar
+        title={draft.savedId ? 'Editar orçamento' : 'Novo orçamento'}
+        subtitle={
+          <span className="flex items-center gap-2">
             <span className="tabular-nums">{draft.ref}</span>
             <span className="size-1 rounded-full bg-slate-400" />
-            {savedAt ? (
-              <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px] text-emerald-500">cloud_done</span>Rascunho salvo</span>
-            ) : 'Rascunho'}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={newProposal} className="h-10 px-4 text-sm font-semibold text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-200/60 dark:hover:bg-white/5 flex items-center gap-2 transition-colors">
-            <span className="material-symbols-outlined text-[18px]">add</span> Novo
-          </button>
-          <button onClick={() => setPreviewOpen(true)} className="h-10 px-4 text-sm font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/10 rounded-xl hover:border-slate-300 dark:hover:border-white/20 flex items-center gap-2 transition-colors">
-            <span className="material-symbols-outlined text-[18px]">visibility</span> Visualizar
-          </button>
-          <button
-            onClick={generatePDF}
-            disabled={isGenerating}
-            className="h-10 px-5 text-sm font-bold text-slate-900 bg-primary rounded-xl hover:brightness-95 shadow-lg shadow-primary/20 flex items-center gap-2 transition disabled:opacity-60"
-          >
-            <span className="material-symbols-outlined text-[18px]">{isGenerating ? 'hourglass_empty' : 'download'}</span>
-            {isGenerating ? 'Gerando…' : 'Baixar PDF'}
-          </button>
-        </div>
-      </div>
+            {draft.savedId ? 'Salvo no sistema' : savedAt ? 'Rascunho automático' : 'Monte a proposta, salve e exporte em PDF.'}
+          </span>
+        }
+        driveKey="orcamentos"
+        onSave={handleSave}
+        onClear={newProposal}
+        onPdf={generatePDF}
+        onDrive={handleDrive}
+        onPreview={() => setPreviewOpen(true)}
+        busy={busy}
+        extra={
+          <div className="relative">
+            <button onClick={() => setSavedOpen(o => !o)} className="h-10 px-4 text-sm font-semibold rounded-lg flex items-center gap-2 text-slate-700 dark:text-slate-200 bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5">
+              <span className="material-symbols-outlined text-[18px]">folder_open</span> Salvos
+              {budgets.length > 0 && <span className="text-[11px] font-bold bg-primary/20 text-slate-900 dark:text-primary px-1.5 rounded">{budgets.length}</span>}
+            </button>
+            {savedOpen && (
+              <div className="absolute left-0 xl:left-auto xl:right-0 top-12 z-40 w-96 max-w-[90vw] bg-white dark:bg-neutral-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden">
+                <p className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-100 dark:border-white/5">Orçamentos salvos</p>
+                <div className="max-h-80 overflow-y-auto custom-scrollbar">
+                  {budgets.length === 0 ? (
+                    <p className="p-6 text-center text-xs text-slate-400">Nenhum orçamento salvo ainda. Use o botão Salvar.</p>
+                  ) : budgets.map(b => (
+                    <div key={b.id} className={`group flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-white/5 ${b.id === draft.savedId ? 'bg-primary/10' : ''}`}>
+                      <button onClick={() => openSaved(b)} className="flex-1 min-w-0 text-left">
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{b.clientName}</p>
+                        <p className="text-xs text-slate-500 truncate">{b.ref} · {b.title}</p>
+                      </button>
+                      <span className="text-xs font-bold text-slate-700 dark:text-slate-200 tabular-nums whitespace-nowrap">{money(b.total)}</span>
+                      <button
+                        title="Excluir"
+                        onClick={async () => { if (confirm(`Excluir o orçamento ${b.ref}?`)) { await deleteBudget(b.id); if (b.id === draft.savedId) set('savedId', undefined); } }}
+                        className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        }
+      />
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 flex-1 min-h-0">
         {/* Editor */}
@@ -523,6 +592,8 @@ const Orcamentos: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <Toast toast={toast} onClose={() => show(null)} />
 
       {/* Visualização em tela cheia */}
       {previewOpen && (
