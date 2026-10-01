@@ -18,6 +18,7 @@ import Kanban from './pages/Kanban';
 import Reports from './pages/Reports';
 import Orcamentos from './pages/Orcamentos';
 import Files from './pages/Files';
+import NotasFiscais from './pages/NotasFiscais';
 
 
 const App: React.FC = () => {
@@ -33,6 +34,7 @@ const App: React.FC = () => {
           <Route path="relatorios" element={<Reports />} />
           <Route path="precos" element={<PriceTable />} />
           <Route path="financas" element={<Finances />} />
+          <Route path="notas-fiscais" element={<NotasFiscais />} />
           <Route path="clientes" element={<Clients />} />
           <Route path="clientes/:id" element={<ClientDetails />} />
           <Route path="notas" element={<Notes />} />

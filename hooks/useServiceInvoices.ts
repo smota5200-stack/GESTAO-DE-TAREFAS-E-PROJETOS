@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { ServiceInvoice } from '../types';
+import { mapInvoiceRow } from './useNotasFiscais';
 
 export function useServiceInvoices(clientId: string | undefined) {
     const [invoices, setInvoices] = useState<ServiceInvoice[]>([]);
@@ -19,16 +20,7 @@ export function useServiceInvoices(clientId: string | undefined) {
             console.error('Erro ao buscar notas fiscais:', error);
         } else {
             setInvoices(
-                (data || []).map((row: any) => ({
-                    id: row.id,
-                    clientId: row.client_id,
-                    invoiceNumber: row.invoice_number,
-                    description: row.description || '',
-                    amount: parseFloat(row.amount) || 0,
-                    issueDate: row.issue_date,
-                    fileUrl: row.file_url || '',
-                    createdAt: row.created_at
-                }))
+                (data || []).map(mapInvoiceRow)
             );
         }
         setLoading(false);

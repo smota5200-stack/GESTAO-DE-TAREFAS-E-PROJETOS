@@ -145,6 +145,18 @@ export interface ServiceInvoice {
   issueDate: string;
   fileUrl: string;
   createdAt: string;
+  // Campos da NFS-e (Nota do Milhão)
+  verificationCode?: string;
+  issuedAt?: string;
+  issAmount?: number;
+  takerName?: string;
+  takerDoc?: string;
+  takerEmail?: string;
+  providerCcm?: string;
+  status?: 'emitida' | 'cancelada';
+  filePath?: string;
+  xmlPath?: string;
+  nfseUrl?: string;
 }
 
 export interface DemandComment {

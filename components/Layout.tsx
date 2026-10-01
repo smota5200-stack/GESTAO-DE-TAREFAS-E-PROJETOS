@@ -107,6 +107,7 @@ const Layout: React.FC = () => {
     { path: '/relatorios', icon: 'insert_chart', label: 'Relatórios' },
     { path: '/precos', icon: 'sell', label: 'Tabela de Preços' },
     { path: '/financas', icon: 'account_balance_wallet', label: 'Finanças' },
+    { path: '/notas-fiscais', icon: 'receipt_long', label: 'Notas Fiscais' },
     { path: '/clientes', icon: 'group', label: 'Clientes' },
     { path: '/notas', icon: 'sticky_note_2', label: 'Notas' },
     { path: '/senhas', icon: 'lock', label: 'Senhas' },

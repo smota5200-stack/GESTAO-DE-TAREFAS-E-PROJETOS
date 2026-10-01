@@ -1,423 +1,544 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useLayoutEffect } from 'react';
 import { useClients } from '../hooks/useClients';
-import { useNavigate } from 'react-router-dom';
+import { usePriceTable } from '../hooks/usePriceTable';
 
 interface LineItem {
   id: string;
   description: string;
+  details: string;
   quantity: number;
   unitPrice: number;
-  warranty: string;
 }
+
+interface Draft {
+  ref: string;
+  selectedClientId: string;
+  contactName: string;
+  company: string;
+  phone: string;
+  email: string;
+  currency: string;
+  proposalDate: string;
+  validityDays: number;
+  deliveryTime: string;
+  paymentTerms: string;
+  observations: string;
+  discount: number;
+  items: LineItem[];
+}
+
+const DRAFT_KEY = 'studio_mota_orcamento_rascunho';
+const A4_WIDTH = 794; // px @96dpi
+const A4_HEIGHT = 1123;
+
+const CURRENCIES: Record<string, { locale: string; code: string; label: string }> = {
+  REAL: { locale: 'pt-BR', code: 'BRL', label: 'Real (R$)' },
+  USD: { locale: 'en-US', code: 'USD', label: 'Dólar (US$)' },
+  EUR: { locale: 'de-DE', code: 'EUR', label: 'Euro (€)' },
+};
+
+const todayISO = () => new Date().toISOString().split('T')[0];
+const newRef = () => `ORC-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000 + 1000)}`;
+
+const emptyDraft = (): Draft => ({
+  ref: newRef(),
+  selectedClientId: '',
+  contactName: '',
+  company: '',
+  phone: '',
+  email: '',
+  currency: 'REAL',
+  proposalDate: todayISO(),
+  validityDays: 15,
+  deliveryTime: '',
+  paymentTerms: '50% na aprovação e 50% na entrega',
+  observations: '',
+  discount: 0,
+  items: [],
+});
+
+const loadDraft = (): Draft => {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (raw) return { ...emptyDraft(), ...JSON.parse(raw) };
+  } catch { /* storage indisponível */ }
+  return emptyDraft();
+};
+
+const formatDatePTBR = (iso: string) => {
+  if (!iso) return '—';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+};
+
+/* ---------- Pequenos componentes de formulário ---------- */
+
+const inputCls =
+  'w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-primary focus:ring-2 focus:ring-primary/30 transition-all';
+
+const Field: React.FC<{ label: string; children: React.ReactNode; className?: string; hint?: string }> = ({ label, children, className = '', hint }) => (
+  <label className={`block ${className}`}>
+    <span className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">{label}</span>
+    {children}
+    {hint && <span className="block text-[11px] text-slate-400 mt-1">{hint}</span>}
+  </label>
+);
+
+const Section: React.FC<{ step: number; title: string; subtitle?: string; action?: React.ReactNode; children: React.ReactNode }> = ({ step, title, subtitle, action, children }) => (
+  <section className="bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/5 rounded-2xl shadow-sm">
+    <header className="flex items-start justify-between gap-4 px-5 pt-5 pb-4">
+      <div className="flex items-start gap-3">
+        <span className="size-7 shrink-0 rounded-lg bg-primary/15 text-[13px] font-black text-slate-900 dark:text-primary flex items-center justify-center">{step}</span>
+        <div>
+          <h2 className="text-[15px] font-bold text-slate-900 dark:text-white leading-7">{title}</h2>
+          {subtitle && <p className="text-xs text-slate-500 dark:text-slate-400 -mt-0.5">{subtitle}</p>}
+        </div>
+      </div>
+      {action}
+    </header>
+    <div className="px-5 pb-5">{children}</div>
+  </section>
+);
+
+/* ---------- Página ---------- */
 
 const Orcamentos: React.FC = () => {
   const { clients } = useClients();
-  const navigate = useNavigate();
-  const pdfRef = useRef<HTMLDivElement>(null);
+  const { items: priceItems } = usePriceTable();
 
-  // States: Left Form
-  const [selectedClientId, setSelectedClientId] = useState('');
-  const [contactName, setContactName] = useState('');
-  const [company, setCompany] = useState('');
-  const [birthday, setBirthday] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [currency, setCurrency] = useState('REAL');
-  
-  // Tabs for sub-forms
-  const [activeTab, setActiveTab] = useState<'datas' | 'pagamento' | 'observacao'>('datas');
-
-  // "Datas" Tab
-  const [proposalDate, setProposalDate] = useState(new Date().toISOString().split('T')[0]);
-  const [validityDays, setValidityDays] = useState(30);
-
-  // Calculated Validade Final
-  const finalValidityDate = useMemo(() => {
-    if (!proposalDate || !validityDays) return '';
-    const d = new Date(proposalDate + 'T12:00:00Z');
-    d.setDate(d.getDate() + Number(validityDays));
-    return d.toISOString().split('T')[0];
-  }, [proposalDate, validityDays]);
-
-  // "Pagamento" Tab
-  const [paymentTerms, setPaymentTerms] = useState('À combinar');
-  
-  // "Observação" Tab
-  const [observations, setObservations] = useState('');
-
-  // Items
-  const [items, setItems] = useState<LineItem[]>([]);
-  
+  const [draft, setDraft] = useState<Draft>(loadDraft);
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState('');
 
-  // Auto-fill when a client is selected
-  const selectedClient = clients.find(c => c.id === selectedClientId);
+  const pdfRef = useRef<HTMLDivElement>(null);
+  const previewBoxRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.6);
+  const [docHeight, setDocHeight] = useState(A4_HEIGHT);
+
+  const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft(d => ({ ...d, [key]: value }));
+
+  // Autosave do rascunho
   useEffect(() => {
-    if (selectedClient) {
-      setContactName(selectedClient.name || '');
-      setCompany(selectedClient.company || '');
-      setPhone(selectedClient.phone || '');
-      setEmail(selectedClient.email || '');
-    }
-  }, [selectedClient]);
+    const t = setTimeout(() => {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+        setSavedAt(new Date());
+      } catch { /* ignora */ }
+    }, 500);
+    return () => clearTimeout(t);
+  }, [draft]);
 
-  const addItem = () => {
-    setItems([...items, { id: Date.now().toString(), description: '', quantity: 1, unitPrice: 0, warranty: 'S/ Garantia' }]);
+  // Escala da prévia A4 para caber na coluna
+  useLayoutEffect(() => {
+    const el = previewBoxRef.current;
+    if (!el) return;
+    const update = () => setScale(Math.min(1, (el.clientWidth - 48) / A4_WIDTH));
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    const doc = pdfRef.current;
+    const ro2 = new ResizeObserver(() => doc && setDocHeight(doc.offsetHeight || A4_HEIGHT));
+    if (doc) ro2.observe(doc);
+    return () => { ro.disconnect(); ro2.disconnect(); };
+  }, []);
+
+  const handleClientChange = (id: string) => {
+    const c = clients.find(cl => cl.id === id);
+    setDraft(d => ({
+      ...d,
+      selectedClientId: id,
+      contactName: c?.name || d.contactName,
+      company: c?.company || d.company,
+      phone: c?.phone || d.phone,
+      email: c?.email || d.email,
+    }));
   };
 
-  const removeItem = (id: string) => {
-    setItems(items.filter(item => item.id !== id));
+  const addItem = (partial?: Partial<LineItem>) =>
+    set('items', [...draft.items, { id: `${Date.now()}-${Math.random()}`, description: '', details: '', quantity: 1, unitPrice: 0, ...partial }]);
+  const updateItem = (id: string, field: keyof LineItem, value: any) =>
+    set('items', draft.items.map(i => (i.id === id ? { ...i, [field]: value } : i)));
+  const removeItem = (id: string) => set('items', draft.items.filter(i => i.id !== id));
+  const moveItem = (index: number, dir: -1 | 1) => {
+    const next = [...draft.items];
+    const target = index + dir;
+    if (target < 0 || target >= next.length) return;
+    [next[index], next[target]] = [next[target], next[index]];
+    set('items', next);
   };
 
-  const updateItem = (id: string, field: keyof LineItem, value: any) => {
-    setItems(items.map(item => item.id === id ? { ...item, [field]: value } : item));
-  };
+  const cur = CURRENCIES[draft.currency] || CURRENCIES.REAL;
+  const money = (v: number) => new Intl.NumberFormat(cur.locale, { style: 'currency', currency: cur.code }).format(v || 0);
 
-  const calculateTotal = () => {
-    return items.reduce((acc, item) => acc + (Number(item.quantity) * Number(item.unitPrice)), 0);
-  };
+  const subtotal = draft.items.reduce((acc, i) => acc + Number(i.quantity) * Number(i.unitPrice), 0);
+  const discount = Math.min(Number(draft.discount) || 0, subtotal);
+  const total = subtotal - discount;
 
-  const formatDatePTBR = (isoString: string) => {
-    if (!isoString) return 'DD/MM/AAAA';
-    const [y, m, d] = isoString.split('-');
-    return `${d}/${m}/${y}`;
-  };
+  const validUntil = useMemo(() => {
+    if (!draft.proposalDate) return '';
+    const d = new Date(draft.proposalDate + 'T12:00:00Z');
+    d.setDate(d.getDate() + Number(draft.validityDays || 0));
+    return d.toISOString().split('T')[0];
+  }, [draft.proposalDate, draft.validityDays]);
 
-  const randomRef = useMemo(() => `2026-PROP-${Math.floor(Math.random() * 100000).toString().padStart(5, '0')}`, []);
+  const filteredPriceItems = priceItems
+    .filter(p => p.title.toLowerCase().includes(pickerSearch.toLowerCase()))
+    .slice(0, 40);
+
+  const newProposal = () => {
+    if (draft.items.length && !confirm('Começar um novo orçamento? O rascunho atual será apagado.')) return;
+    setDraft(emptyDraft());
+  };
 
   const generatePDF = async () => {
     if (!pdfRef.current) return;
     setIsGenerating(true);
-
     try {
       const html2pdf = (window as any).html2pdf;
-      const opt = {
-        margin:       [0, 0, 0, 0], // Removendo a margem do framework para o banner encostar nas bordas da A4
-        filename:     `Proposta_${company.replace(/\s+/g, '_') || 'Cliente'}.pdf`,
-        image:        { type: 'jpeg', quality: 1.0 },
-        html2canvas:  { scale: 2, useCORS: true, logging: false },
-        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-      };
-
-      await html2pdf().from(pdfRef.current).set(opt).save();
+      const name = (draft.company || draft.contactName || 'Cliente').trim().replace(/\s+/g, '_');
+      await html2pdf()
+        .from(pdfRef.current)
+        .set({
+          margin: 0,
+          filename: `Proposta_${draft.ref}_${name}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, logging: false },
+          jsPDF: { unit: 'px', format: [A4_WIDTH, A4_HEIGHT], orientation: 'portrait', hotfixes: ['px_scaling'] },
+          pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', '.avoid-break'] },
+        })
+        .save();
     } catch (error) {
-      console.error("Erro ao gerar PDF:", error);
-      alert("Houve um problema ao exportar o PDF.");
+      console.error('Erro ao gerar PDF:', error);
+      alert('Houve um problema ao exportar o PDF.');
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const clearForm = () => {
-    setSelectedClientId('');
-    setContactName('');
-    setCompany('');
-    setBirthday('');
-    setPhone('');
-    setEmail('');
-    setCurrency('REAL');
-    setProposalDate(new Date().toISOString().split('T')[0]);
-    setValidityDays(30);
-    setPaymentTerms('À combinar');
-    setObservations('');
-    setItems([]);
-  };
+  /* ---------- Documento (prévia e PDF) ---------- */
+  const proposalDoc = (
+    <div
+      ref={pdfRef}
+      className="bg-white text-slate-800 flex flex-col"
+      style={{ width: A4_WIDTH, minHeight: A4_HEIGHT, fontFamily: 'Inter, sans-serif' }}
+    >
+      {/* Faixa de marca */}
+      <div className="h-2 w-full" style={{ background: '#bcd200' }} />
+
+      {/* Cabeçalho */}
+      <div className="px-14 pt-12 pb-10 flex items-start justify-between">
+        <div className="flex items-center gap-4">
+          <img src="/logo.png" alt="Studio Mota" className="h-12 w-auto object-contain" />
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-slate-400">Studio Mota</p>
+            <p className="text-[11px] text-slate-400">Design & Produção Gráfica</p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">Orçamento</p>
+          <p className="text-[15px] font-bold text-slate-900 tabular-nums">{draft.ref}</p>
+          <p className="text-[11px] text-slate-500 mt-0.5">{formatDatePTBR(draft.proposalDate)}</p>
+        </div>
+      </div>
+
+      {/* Título + cliente */}
+      <div className="px-14 pb-10">
+        <h1 className="text-[40px] leading-[1.05] font-black tracking-tight text-slate-900">Proposta<br />Comercial</h1>
+        <div className="mt-8 grid grid-cols-2 gap-10 border-t border-slate-200 pt-6">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400 mb-2">Preparado para</p>
+            <p className="text-[15px] font-bold text-slate-900">{draft.company || 'Empresa do cliente'}</p>
+            <p className="text-[12px] text-slate-600">{draft.contactName || 'Nome do contato'}</p>
+          </div>
+          <div className="text-[12px] text-slate-600 space-y-0.5">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400 mb-2">Contato</p>
+            <p>{draft.email || 'email@cliente.com'}</p>
+            <p>{draft.phone || '(00) 00000-0000'}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Itens */}
+      <div className="px-14 flex-1">
+        <table className="w-full text-[12px] border-collapse">
+          <thead>
+            <tr className="text-[10px] uppercase tracking-[0.15em] text-slate-400 border-b-2 border-slate-900">
+              <th className="text-left font-semibold py-2.5 w-8">#</th>
+              <th className="text-left font-semibold py-2.5">Serviço</th>
+              <th className="text-center font-semibold py-2.5 w-14">Qtd.</th>
+              <th className="text-right font-semibold py-2.5 w-28">Unitário</th>
+              <th className="text-right font-semibold py-2.5 w-32">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {draft.items.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="py-14 text-center text-slate-400 italic">Os itens adicionados aparecem aqui.</td>
+              </tr>
+            ) : (
+              draft.items.map((item, i) => (
+                <tr key={item.id} className="border-b border-slate-200 align-top">
+                  <td className="py-4 text-slate-400 tabular-nums">{String(i + 1).padStart(2, '0')}</td>
+                  <td className="py-4 pr-4">
+                    <p className="font-semibold text-slate-900">{item.description || 'Item sem nome'}</p>
+                    {item.details && <p className="text-[11px] text-slate-500 mt-1 whitespace-pre-wrap leading-relaxed">{item.details}</p>}
+                  </td>
+                  <td className="py-4 text-center tabular-nums">{item.quantity}</td>
+                  <td className="py-4 text-right tabular-nums text-slate-600">{money(Number(item.unitPrice))}</td>
+                  <td className="py-4 text-right tabular-nums font-semibold text-slate-900">{money(Number(item.quantity) * Number(item.unitPrice))}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+
+        {/* Totais */}
+        <div className="flex justify-end mt-6 avoid-break">
+          <div className="w-72 text-[12px]">
+            {discount > 0 && (
+              <>
+                <div className="flex justify-between py-1.5 text-slate-600"><span>Subtotal</span><span className="tabular-nums">{money(subtotal)}</span></div>
+                <div className="flex justify-between py-1.5 text-slate-600"><span>Desconto</span><span className="tabular-nums">− {money(discount)}</span></div>
+              </>
+            )}
+            <div className="flex justify-between items-baseline mt-2 pt-4 border-t-2 border-slate-900">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">Investimento total</span>
+              <span className="text-[24px] font-black tracking-tight text-slate-900 tabular-nums">{money(total)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Condições */}
+        <div className="grid grid-cols-3 gap-6 mt-12 avoid-break">
+          {[
+            { label: 'Validade', value: `${draft.validityDays} dias · até ${formatDatePTBR(validUntil)}` },
+            { label: 'Prazo de entrega', value: draft.deliveryTime || 'A combinar' },
+            { label: 'Pagamento', value: draft.paymentTerms || 'A combinar' },
+          ].map(c => (
+            <div key={c.label} className="border-l-2 pl-3" style={{ borderColor: '#bcd200' }}>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400 mb-1">{c.label}</p>
+              <p className="text-[12px] text-slate-800 whitespace-pre-wrap leading-relaxed">{c.value}</p>
+            </div>
+          ))}
+        </div>
+
+        {draft.observations && (
+          <div className="mt-8 avoid-break">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400 mb-1">Observações</p>
+            <p className="text-[12px] text-slate-600 whitespace-pre-wrap leading-relaxed">{draft.observations}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Assinatura e rodapé */}
+      <div className="px-14 pt-14 pb-10 avoid-break">
+        <div className="grid grid-cols-2 gap-16 mb-10">
+          <div className="border-t border-slate-300 pt-2 text-[11px] text-slate-500">Studio Mota</div>
+          <div className="border-t border-slate-300 pt-2 text-[11px] text-slate-500">De acordo — {draft.company || 'Cliente'}</div>
+        </div>
+        <div className="flex justify-between text-[10px] text-slate-400 border-t border-slate-100 pt-4">
+          <span>Studio Mota · Design & Produção Gráfica</span>
+          <span>{draft.ref}</span>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="max-w-[1600px] mx-auto space-y-6 animate-in fade-in duration-500 h-[calc(100vh-6rem)] flex flex-col">
-      {/* Top Header Controls */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 shrink-0">
+    <div className="max-w-[1600px] mx-auto flex flex-col gap-6 animate-in fade-in duration-500 xl:h-[calc(100vh-6rem)]">
+      {/* Cabeçalho da página */}
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 shrink-0">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">Novo orçamento</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Monte a proposta, salve e exporte em PDF.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-1">Orçamentos</p>
+          <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">Nova proposta</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
+            <span className="tabular-nums">{draft.ref}</span>
+            <span className="size-1 rounded-full bg-slate-400" />
+            {savedAt ? (
+              <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px] text-emerald-500">cloud_done</span>Rascunho salvo</span>
+            ) : 'Rascunho'}
+          </p>
         </div>
-        
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar lg:pb-0">
-          <button onClick={() => navigate(-1)} className="px-4 py-2 text-sm font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 flex items-center gap-2 whitespace-nowrap">
-            <span className="material-symbols-outlined text-sm">arrow_back</span> Voltar
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={newProposal} className="h-10 px-4 text-sm font-semibold text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-200/60 dark:hover:bg-white/5 flex items-center gap-2 transition-colors">
+            <span className="material-symbols-outlined text-[18px]">add</span> Novo
           </button>
-          <button className="px-4 py-2 text-sm font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 flex items-center gap-2 whitespace-nowrap">
-            <span className="material-symbols-outlined text-sm">save</span> Salvar
+          <button onClick={() => setPreviewOpen(true)} className="h-10 px-4 text-sm font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/10 rounded-xl hover:border-slate-300 dark:hover:border-white/20 flex items-center gap-2 transition-colors">
+            <span className="material-symbols-outlined text-[18px]">visibility</span> Visualizar
           </button>
-          
-          <div className="w-px h-8 bg-slate-200 mx-1"></div>
-          
-          <button onClick={clearForm} className="px-4 py-2 text-sm font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center gap-2 whitespace-nowrap">
-            <span className="material-symbols-outlined text-sm">delete_sweep</span> Limpar Formulário
-          </button>
-          <button 
-            onClick={generatePDF} 
+          <button
+            onClick={generatePDF}
             disabled={isGenerating}
-            className="px-4 py-2 text-sm font-bold text-emerald-900 bg-emerald-300 hover:bg-emerald-400 rounded-lg shadow-sm flex items-center gap-2 whitespace-nowrap transition-colors"
+            className="h-10 px-5 text-sm font-bold text-slate-900 bg-primary rounded-xl hover:brightness-95 shadow-lg shadow-primary/20 flex items-center gap-2 transition disabled:opacity-60"
           >
-            <span className="material-symbols-outlined text-sm">{isGenerating ? 'hourglass_empty' : 'download'}</span> Baixar PDF
-          </button>
-          <button className="px-4 py-2 text-sm font-bold text-sky-900 bg-sky-200 hover:bg-sky-300 rounded-lg shadow-sm flex items-center gap-2 whitespace-nowrap">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/1/12/Google_Drive_icon_%282020%29.svg" className="w-4 h-4 object-contain" alt="Drive" /> Salvar no Google Drive
-          </button>
-          <button className="px-4 py-2 text-sm font-bold text-white bg-slate-400 hover:bg-slate-500 rounded-lg shadow-sm flex items-center gap-2 whitespace-nowrap">
-            <span className="material-symbols-outlined text-sm">visibility</span> Visualizar
+            <span className="material-symbols-outlined text-[18px]">{isGenerating ? 'hourglass_empty' : 'download'}</span>
+            {isGenerating ? 'Gerando…' : 'Baixar PDF'}
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 flex-1 min-h-0">
-        
-        {/* LEFT COLUMN: Form Generator */}
-        <div className="xl:col-span-5 flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-2 h-full">
-          
-          {/* Card 1: Dados da Proposta */}
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-5 shrink-0">
-            <div className="flex items-center gap-2 text-slate-800 font-bold mb-2">
-              <span className="material-symbols-outlined text-primary text-xl">description</span>
-              Dados da proposta
-            </div>
-
+        {/* Editor */}
+        <div className="xl:col-span-5 flex flex-col gap-4 xl:overflow-y-auto custom-scrollbar xl:pr-1 pb-6">
+          <Section step={1} title="Cliente" subtitle="Escolha da lista ou preencha à mão">
             <div className="space-y-4">
-              {/* Cliente */}
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1.5">Cliente</label>
-                <select
-                  value={selectedClientId}
-                  onChange={(e) => setSelectedClientId(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-primary/50"
-                >
-                  <option value="">Selecione um cliente</option>
-                  {clients.map(c => <option key={c.id} value={c.id}>{c.company} ({c.name})</option>)}
+              <Field label="Cliente cadastrado">
+                <select value={draft.selectedClientId} onChange={e => handleClientChange(e.target.value)} className={inputCls}>
+                  <option value="">— Selecionar —</option>
+                  {clients.map(c => (
+                    <option key={c.id} value={c.id}>{c.company ? `${c.company} · ${c.name}` : c.name}</option>
+                  ))}
                 </select>
-              </div>
-
-              {/* Nome & Empresa */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Nome do contato</label>
-                  <input type="text" value={contactName} onChange={e => setContactName(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-primary/50" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Empresa</label>
-                  <input type="text" value={company} onChange={e => setCompany(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-primary/50" />
-                </div>
-              </div>
-
-              {/* Aniversário, Telefone, Email */}
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Data de aniversário</label>
-                  <input type="date" value={birthday} onChange={e => setBirthday(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-primary/50" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Telefone</label>
-                  <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-primary/50" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">E-mail</label>
-                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-primary/50" />
-                </div>
-              </div>
-
-              {/* Moeda */}
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1.5">Moeda</label>
-                <select value={currency} onChange={e => setCurrency(e.target.value)} className="w-32 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-primary/50">
-                  <option value="REAL">REAL</option>
-                  <option value="USD">DÓLAR</option>
-                  <option value="EUR">EURO</option>
-                </select>
-              </div>
-
-              {/* Sub-Tabs: Datas, Pagamento, Observação */}
-              <div className="pt-4 border-t border-slate-100">
-                <div className="flex bg-slate-100 rounded-lg p-1 gap-1 mb-4">
-                  <button onClick={() => setActiveTab('datas')} className={`flex-1 text-sm font-bold py-1.5 rounded-md transition-colors ${activeTab === 'datas' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500'}`}>Datas</button>
-                  <button onClick={() => setActiveTab('pagamento')} className={`flex-1 text-sm font-bold py-1.5 rounded-md transition-colors ${activeTab === 'pagamento' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500'}`}>Pagamento</button>
-                  <button onClick={() => setActiveTab('observacao')} className={`flex-1 text-sm font-bold py-1.5 rounded-md transition-colors ${activeTab === 'observacao' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500'}`}>Observação</button>
-                </div>
-
-                {activeTab === 'datas' && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1.5">Data da proposta</label>
-                      <input type="date" value={proposalDate} onChange={e => setProposalDate(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-primary/50" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1.5">Dias de validade</label>
-                      <input type="number" value={validityDays} onChange={e => setValidityDays(Number(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-primary/50" />
-                    </div>
-                    <div className="col-span-2 sm:col-span-1">
-                      <label className="block text-xs font-bold text-slate-600 mb-1.5">Validade final</label>
-                      <input type="date" value={finalValidityDate} disabled className="w-full bg-slate-100 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-500 cursor-not-allowed outline-none" />
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'pagamento' && (
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1.5">Detalhes de Pagamento</label>
-                    <textarea value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} rows={3} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-primary/50" placeholder="Ex: 50% adiantado, 50% na aprovação"></textarea>
-                  </div>
-                )}
-
-                {activeTab === 'observacao' && (
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1.5">Observações ou Condições Extras</label>
-                    <textarea value={observations} onChange={e => setObservations(e.target.value)} rows={3} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-primary/50" placeholder="Anotações gerais visíveis ou não..."></textarea>
-                  </div>
-                )}
+              </Field>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Empresa"><input className={inputCls} value={draft.company} onChange={e => set('company', e.target.value)} /></Field>
+                <Field label="Contato"><input className={inputCls} value={draft.contactName} onChange={e => set('contactName', e.target.value)} /></Field>
+                <Field label="E-mail"><input type="email" className={inputCls} value={draft.email} onChange={e => set('email', e.target.value)} /></Field>
+                <Field label="Telefone"><input type="tel" className={inputCls} value={draft.phone} onChange={e => set('phone', e.target.value)} /></Field>
               </div>
             </div>
-          </div>
+          </Section>
 
-          {/* Card 2: Items */}
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 mt-0">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2 text-slate-800 font-bold">
-                <span className="material-symbols-outlined text-blue-500 text-xl">monetization_on</span>
-                Itens
+          <Section
+            step={2}
+            title="Itens"
+            subtitle={draft.items.length ? `${draft.items.length} ${draft.items.length === 1 ? 'item' : 'itens'} · ${money(subtotal)}` : 'Serviços que entram na proposta'}
+            action={
+              <div className="relative flex items-center gap-1.5">
+                <button onClick={() => setPickerOpen(o => !o)} className="h-8 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-white/10 rounded-lg hover:border-primary flex items-center gap-1 transition-colors">
+                  <span className="material-symbols-outlined text-[16px]">sell</span> Da tabela
+                </button>
+                <button onClick={() => addItem()} className="h-8 px-3 text-xs font-bold text-slate-900 bg-primary rounded-lg hover:brightness-95 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[16px]">add</span> Item
+                </button>
+                {pickerOpen && (
+                  <div className="absolute right-0 top-10 z-30 w-80 bg-white dark:bg-neutral-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden">
+                    <div className="p-2 border-b border-slate-100 dark:border-white/5">
+                      <input autoFocus placeholder="Buscar na tabela de preços…" value={pickerSearch} onChange={e => setPickerSearch(e.target.value)} className={`${inputCls} py-2`} />
+                    </div>
+                    <div className="max-h-72 overflow-y-auto custom-scrollbar">
+                      {filteredPriceItems.length === 0 ? (
+                        <p className="p-4 text-xs text-slate-400 text-center">Nada encontrado.</p>
+                      ) : filteredPriceItems.map(p => (
+                        <button
+                          key={p.id}
+                          onClick={() => { addItem({ description: p.title, details: p.description, unitPrice: p.price, quantity: p.quantity || 1 }); setPickerOpen(false); setPickerSearch(''); }}
+                          className="w-full text-left px-3 py-2.5 hover:bg-primary/10 flex items-center justify-between gap-3"
+                        >
+                          <span className="text-sm text-slate-800 dark:text-slate-200 truncate">{p.title}</span>
+                          <span className="text-xs font-semibold text-slate-500 tabular-nums whitespace-nowrap">{money(p.price)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-              <button onClick={addItem} className="text-xs font-bold px-3 py-1.5 border border-slate-200 rounded-md hover:bg-slate-50 text-slate-600 flex items-center gap-1">
-                <span className="material-symbols-outlined text-sm">add</span> Adicionar
+            }
+          >
+            {draft.items.length === 0 ? (
+              <button onClick={() => addItem()} className="w-full border-2 border-dashed border-slate-200 dark:border-white/10 rounded-xl py-8 text-sm text-slate-400 hover:border-primary hover:text-slate-600 dark:hover:text-slate-200 transition-colors flex flex-col items-center gap-1">
+                <span className="material-symbols-outlined">add_circle</span>
+                Adicionar o primeiro item
               </button>
-            </div>
-
-            {items.length === 0 ? (
-              <p className="text-sm text-slate-400">Nenhum item adicionado ainda.</p>
             ) : (
-              <div className="space-y-4">
-                {items.map(item => (
-                  <div key={item.id} className="grid grid-cols-12 gap-3 p-3 bg-slate-50 border border-slate-100 rounded-xl relative group">
-                    <button onClick={() => removeItem(item.id)} className="absolute -top-2 -right-2 bg-red-100 text-red-500 rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                       <span className="material-symbols-outlined text-[12px]">close</span>
-                    </button>
-                    <div className="col-span-12 sm:col-span-5">
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Descrição</label>
-                      <input type="text" value={item.description} onChange={(e) => updateItem(item.id, 'description', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-primary" placeholder="Nome do item/serviço..." />
+              <div className="space-y-3">
+                {draft.items.map((item, idx) => (
+                  <div key={item.id} className="group rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50/60 dark:bg-black/20 p-3.5 focus-within:border-primary/60 transition-colors">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] font-bold text-slate-400 tabular-nums">ITEM {String(idx + 1).padStart(2, '0')}</span>
+                      <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                        <button title="Subir" onClick={() => moveItem(idx, -1)} className="p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/5"><span className="material-symbols-outlined text-[18px]">keyboard_arrow_up</span></button>
+                        <button title="Descer" onClick={() => moveItem(idx, 1)} className="p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/5"><span className="material-symbols-outlined text-[18px]">keyboard_arrow_down</span></button>
+                        <button title="Remover" onClick={() => removeItem(item.id)} className="p-1 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-500/10"><span className="material-symbols-outlined text-[18px]">delete</span></button>
+                      </div>
                     </div>
-                    <div className="col-span-4 sm:col-span-2">
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Qtde</label>
-                      <input type="number" min="1" value={item.quantity} onChange={(e) => updateItem(item.id, 'quantity', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-primary" />
-                    </div>
-                    <div className="col-span-8 sm:col-span-3">
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Unitário</label>
-                      <input type="number" min="0" value={item.unitPrice} onChange={(e) => updateItem(item.id, 'unitPrice', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-primary" />
-                    </div>
-                    <div className="col-span-12 sm:col-span-2">
-                       <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Garantia</label>
-                       <input type="text" value={item.warranty} onChange={(e) => updateItem(item.id, 'warranty', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-primary" placeholder="3 meses..." />
+                    <div className="space-y-2">
+                      <input value={item.description} onChange={e => updateItem(item.id, 'description', e.target.value)} placeholder="Nome do serviço" className={`${inputCls} font-semibold bg-white dark:bg-black/30`} />
+                      <textarea value={item.details} onChange={e => updateItem(item.id, 'details', e.target.value)} placeholder="Detalhes (opcional) — escopo, formato, prazo…" rows={1} className={`${inputCls} text-xs resize-y bg-white dark:bg-black/30`} />
+                      <div className="grid grid-cols-3 gap-2">
+                        <Field label="Qtd."><input type="number" min={1} value={item.quantity} onChange={e => updateItem(item.id, 'quantity', e.target.value)} className={`${inputCls} bg-white dark:bg-black/30 tabular-nums`} /></Field>
+                        <Field label="Unitário"><input type="number" min={0} step="0.01" value={item.unitPrice} onChange={e => updateItem(item.id, 'unitPrice', e.target.value)} className={`${inputCls} bg-white dark:bg-black/30 tabular-nums`} /></Field>
+                        <div>
+                          <span className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Total</span>
+                          <p className="h-[42px] flex items-center justify-end text-sm font-bold text-slate-900 dark:text-white tabular-nums">{money(Number(item.quantity) * Number(item.unitPrice))}</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
             )}
+          </Section>
+
+          <Section step={3} title="Condições" subtitle="Validade, prazo, pagamento e valores">
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Data da proposta"><input type="date" className={inputCls} value={draft.proposalDate} onChange={e => set('proposalDate', e.target.value)} /></Field>
+              <Field label="Validade (dias)" hint={validUntil ? `Até ${formatDatePTBR(validUntil)}` : undefined}>
+                <input type="number" min={1} className={inputCls} value={draft.validityDays} onChange={e => set('validityDays', Number(e.target.value))} />
+              </Field>
+              <Field label="Prazo de entrega"><input className={inputCls} placeholder="Ex: 10 dias úteis" value={draft.deliveryTime} onChange={e => set('deliveryTime', e.target.value)} /></Field>
+              <Field label="Moeda">
+                <select className={inputCls} value={draft.currency} onChange={e => set('currency', e.target.value)}>
+                  {Object.entries(CURRENCIES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                </select>
+              </Field>
+              <Field label="Pagamento" className="col-span-2">
+                <textarea rows={2} className={inputCls} value={draft.paymentTerms} onChange={e => set('paymentTerms', e.target.value)} />
+              </Field>
+              <Field label="Observações" className="col-span-2">
+                <textarea rows={3} className={inputCls} placeholder="Aparece no fim da proposta" value={draft.observations} onChange={e => set('observations', e.target.value)} />
+              </Field>
+              <Field label="Desconto">
+                <input type="number" min={0} step="0.01" className={`${inputCls} tabular-nums`} value={draft.discount} onChange={e => set('discount', Number(e.target.value))} />
+              </Field>
+            </div>
+          </Section>
+
+          {/* Resumo */}
+          <div className="rounded-2xl bg-slate-900 dark:bg-black/40 border border-slate-800 dark:border-white/5 p-5 flex items-center justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Investimento total</p>
+              {discount > 0 && <p className="text-xs text-slate-500 mt-0.5">{money(subtotal)} − {money(discount)}</p>}
+            </div>
+            <p className="text-3xl font-black tracking-tight text-primary tabular-nums">{money(total)}</p>
           </div>
         </div>
 
-        {/* RIGHT COLUMN: PDF PREVIEW A4 Ratio */}
-        <div className="xl:col-span-7 bg-slate-200 rounded-2xl flex justify-center p-4 xl:p-8 overflow-y-auto custom-scrollbar h-full shadow-inner relative">
-          <div className="bg-white w-full max-w-[800px] min-h-[1050px] shadow-xl border border-slate-200 flex flex-col font-sans" ref={pdfRef}>
-            <div className="px-8 py-8 border-b border-slate-200">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-xl bg-slate-100 border border-slate-200 p-2 flex items-center justify-center">
-                    <img src="/logo.png" alt="Logo Studio Mota" className="max-w-full max-h-full object-contain" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-500">Studio Mota</p>
-                    <h2 className="text-2xl font-black text-slate-900">Proposta Comercial</h2>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Ref.</p>
-                  <p className="text-sm font-bold text-slate-800">{randomRef}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="px-8 py-6 border-b border-slate-200 bg-slate-50/70">
-              <div className="grid grid-cols-2 gap-5 text-[11px] text-slate-600">
-                <div className="space-y-2">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">Contato</p>
-                    <p className="text-sm font-bold text-slate-900">{contactName || 'Nome do cliente'}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">Empresa</p>
-                    <p className="text-sm font-medium text-slate-700">{company || 'Empresa não informada'}</p>
-                  </div>
-                </div>
-                <div className="space-y-2 text-right">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">Data</p>
-                    <p className="text-sm font-medium text-slate-700">{formatDatePTBR(proposalDate)}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">Telefone</p>
-                    <p className="text-sm font-medium text-slate-700">{phone || '(00) 00000-0000'}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">E-mail</p>
-                    <p className="text-sm font-medium text-slate-700 break-all">{email || 'email@cliente.com'}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex-1 px-8 py-6 flex flex-col">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 text-slate-500">
-                    <th className="py-3 font-bold uppercase w-1/2">Descrição</th>
-                    <th className="py-3 font-bold text-center uppercase">Qtde</th>
-                    <th className="py-3 font-bold text-right uppercase">Unitário</th>
-                    <th className="py-3 font-bold text-right uppercase">Total</th>
-                    <th className="py-3 font-bold text-right uppercase">Garantia</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="py-12 text-center text-slate-400 italic">Adicione itens para montar a proposta.</td>
-                    </tr>
-                  ) : (
-                    items.map((item, i) => (
-                      <tr key={i} className="border-b border-slate-100">
-                        <td className="py-4 pr-2 font-bold text-slate-800 break-words">{item.description || 'Item sem nome'}</td>
-                        <td className="py-4 text-center text-slate-600">{item.quantity}</td>
-                        <td className="py-4 text-right text-slate-600">R$ {Number(item.unitPrice).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                        <td className="py-4 text-right font-bold text-slate-900">R$ {(Number(item.quantity) * Number(item.unitPrice)).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                        <td className="py-4 text-right text-slate-500 text-[10px]">{item.warranty}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-
-              <div className="mt-auto pt-8 flex items-end justify-between gap-6">
-                <div className="flex-1 space-y-3">
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500 mb-2">Pagamento</p>
-                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{paymentTerms || 'À combinar'}</p>
-                  </div>
-                  {observations && (
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500 mb-2">Observações</p>
-                      <p className="text-sm text-slate-700 whitespace-pre-wrap">{observations}</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="w-64 bg-slate-900 text-white rounded-xl p-5">
-                  <div className="flex justify-between text-xs uppercase tracking-[0.15em] text-slate-300 pb-2 border-b border-white/10">
-                    <span>Total</span>
-                    <span>{validityDays} dias</span>
-                  </div>
-                  <p className="mt-4 text-3xl font-black tracking-tight">R$ {calculateTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                </div>
+        {/* Prévia */}
+        <div ref={previewBoxRef} className="hidden xl:block xl:col-span-7 rounded-2xl bg-slate-200/70 dark:bg-black/30 border border-slate-200 dark:border-white/5 overflow-y-auto custom-scrollbar">
+          <div className="flex items-center justify-between px-6 pt-4 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+            <span>Prévia · A4</span>
+            <span>{Math.round(scale * 100)}%</span>
+          </div>
+          <div className="p-6 flex justify-center">
+            <div style={{ width: A4_WIDTH * scale, height: docHeight * scale }}>
+              <div className="shadow-2xl shadow-black/20 origin-top-left" style={{ transform: `scale(${scale})`, width: A4_WIDTH }}>
+                {proposalDoc}
               </div>
             </div>
           </div>
         </div>
-
       </div>
+
+      {/* Visualização em tela cheia */}
+      {previewOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm overflow-y-auto p-6 md:p-10" onClick={() => setPreviewOpen(false)}>
+          <div className="max-w-fit mx-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-end gap-2 mb-4">
+              <button onClick={generatePDF} className="h-10 px-4 text-sm font-bold text-slate-900 bg-primary rounded-xl flex items-center gap-2"><span className="material-symbols-outlined text-[18px]">download</span> Baixar PDF</button>
+              <button onClick={() => setPreviewOpen(false)} className="h-10 w-10 rounded-xl bg-white/10 text-white hover:bg-white/20 flex items-center justify-center"><span className="material-symbols-outlined">close</span></button>
+            </div>
+            <div className="shadow-2xl">
+              {/* clone visual; o PDF usa a prévia lateral */}
+              <div dangerouslySetInnerHTML={{ __html: pdfRef.current?.outerHTML || '' }} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
