@@ -162,23 +162,78 @@ async function pdfToText(file: File): Promise<string> {
   return lines.join('\n');
 }
 
+/**
+ * Lê o texto de uma NFS-e (PDF da Prefeitura de SP).
+ *
+ * O PDF da Prefeitura costuma sair em COLUNAS: primeiro todos os rótulos
+ * ("Nome/Razão Social:", "CPF/CNPJ:"...) e só depois os valores, em outra linha.
+ * Por isso cada campo tenta, nesta ordem:
+ *   1) "Rótulo: valor" na mesma linha;
+ *   2) o valor solto dentro da seção certa (cabeçalho, prestador, tomador), por formato.
+ */
 export function parseNfseText(text: string): ParsedNfse {
   const t = text.replace(/\r/g, '');
-  const pick = (re: RegExp, src = t) => (src.match(re)?.[1] || '').trim();
+  const idx = (re: RegExp, from = 0) => {
+    const m = t.slice(from).match(re);
+    return m && m.index !== undefined ? m.index + from : -1;
+  };
+  const slice = (a: number, b: number) => (a < 0 ? '' : t.slice(a, b > a ? b : undefined));
 
-  const tomadorIdx = t.search(/TOMADOR DE SERVI[ÇC]OS/i);
-  const prestador = tomadorIdx > 0 ? t.slice(0, tomadorIdx) : t;
-  const discIdx = t.search(/DISCRIMINA[ÇC][ÃA]O DOS SERVI[ÇC]OS/i);
-  const tomador = tomadorIdx >= 0 ? t.slice(tomadorIdx, discIdx > tomadorIdx ? discIdx : undefined) : '';
+  const iPrest = idx(/PRESTADOR DE SERVI[ÇC]OS/i);
+  const iTomador = idx(/TOMADOR DE SERVI[ÇC]OS/i);
+  const iInterm = idx(/INTERMEDI[ÁA]RIO DE SERVI[ÇC]OS/i);
+  const iDisc = idx(/DISCRIMINA[ÇC][ÃA]O D[EO]S? SERVI[ÇC]OS/i);
 
-  const numero = pick(/N[úu]mero da Nota\s*:?\s*(\d+)/i);
-  const dataHora = t.match(/Data e Hora de Emiss[ãa]o\s*:?\s*(\d{2}\/\d{2}\/\d{4})\s*(\d{2}:\d{2}(?::\d{2})?)?/i);
-  const codigo = pick(/C[óo]digo de Verifica[çc][ãa]o\s*:?\s*([A-Z0-9]{4}-?[A-Z0-9]{4})/i).toUpperCase();
-  const ccm = pick(/Inscri[çc][ãa]o Municipal\s*:?\s*([\d.\-/]+)/i, prestador);
+  const header = iPrest >= 0 ? t.slice(0, iPrest) : t.slice(0, 800);
+  const prestador = slice(iPrest, iTomador);
+  const tomador = slice(iTomador, iInterm > iTomador ? iInterm : iDisc);
 
+  // linha só com rótulos: "CPF/CNPJ:  Inscrição Municipal:"
+  const isLabelLine = (l: string) => /^(?:[^:]{1,40}:\s*)+$/.test(l.trim());
+  const clean = (v: string) => (/^[-–—\s*]*$/.test(v) ? '' : v.trim());
+
+  const RE_CNPJ = /\b\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}\b/;
+  const RE_CPF = /\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/;
+  const RE_CCM = /\b\d\.\d{3}\.\d{3}-\d\b/;
+  const RE_EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/;
+
+  // ---- cabeçalho: número, data/hora, código de verificação ----
+  const numero =
+    header.match(/N[úu]mero da Nota\s*:?[ \t]*(\d+)/i)?.[1] ||
+    header.match(/\b(\d{8})\b/)?.[1] ||
+    '';
+  const dataHora = header.match(/(\d{2}\/\d{2}\/\d{4})\s*(\d{2}:\d{2}(?::\d{2})?)?/);
+  const codigo = (
+    header.match(/C[óo]digo de Verifica[çc][ãa]o\s*:?[ \t]*([A-Z0-9]{4}-[A-Z0-9]{4})/i)?.[1] ||
+    header.match(/\b([A-Z0-9]{4}-[A-Z0-9]{4})\b/)?.[1] ||
+    header.match(/\b((?=[A-Z0-9]*[A-Z])[A-Z0-9]{8})\b/)?.[1] ||
+    ''
+  ).toUpperCase();
+
+  // ---- prestador ----
+  const ccm =
+    prestador.match(/Inscri[çc][ãa]o Municipal\s*:[ \t]*([\d.\-/]+)/i)?.[1] ||
+    prestador.match(RE_CCM)?.[0] ||
+    '';
+
+  // ---- tomador ----
+  const takerValues = tomador
+    .split('\n')
+    .map(l => l.trim())
+    .slice(1) // título da seção
+    .filter(l => l && !isLabelLine(l));
+
+  const takerNameSameLine = clean(tomador.match(/Nome\/Raz[ãa]o Social\s*:[ \t]*(\S[^\n]*)/i)?.[1] || '');
+  const takerNameColumn = takerValues.find(l => !RE_CNPJ.test(l) && !RE_CPF.test(l) && !RE_EMAIL.test(l)) || '';
+  const takerName = takerNameSameLine || clean(takerNameColumn);
+
+  const takerDoc = tomador.match(RE_CNPJ)?.[0] || tomador.match(RE_CPF)?.[0] || '';
+  const takerEmail = tomador.match(RE_EMAIL)?.[0]?.toLowerCase() || '';
+
+  // ---- discriminação ----
   let description = '';
-  if (discIdx >= 0) {
-    const after = t.slice(discIdx).replace(/^.*\n/, '');
+  if (iDisc >= 0) {
+    const after = t.slice(iDisc).replace(/^.*\n/, '');
     const end = after.search(/VALOR TOTAL D[OA]/i);
     description = (end >= 0 ? after.slice(0, end) : after.slice(0, 800)).trim();
   }
@@ -191,10 +246,10 @@ export function parseNfseText(text: string): ParsedNfse {
     providerCcm: ccm,
     issueDate: issueDate || emptyParsed().issueDate,
     issuedAt: issueDate && dataHora?.[2] ? `${issueDate}T${dataHora[2].length === 5 ? dataHora[2] + ':00' : dataHora[2]}` : '',
-    amount: brNumber(pick(/VALOR TOTAL D[OA] (?:SERVI[ÇC]O|NOTA)\s*=?\s*R\$\s*([\d.,]+)/i)),
-    takerName: pick(/Nome\/Raz[ãa]o Social\s*:?\s*(.+)/i, tomador),
-    takerDoc: pick(/CPF\/CNPJ\s*:?\s*([\d./-]+)/i, tomador),
-    takerEmail: pick(/E-?mail\s*:?\s*([^\s]+@[^\s]+)/i, tomador),
+    amount: brNumber(t.match(/VALOR TOTAL D[OA] (?:SERVI[ÇC]O|NOTA)\s*=?\s*R\$\s*([\d.,]+)/i)?.[1] || ''),
+    takerName,
+    takerDoc,
+    takerEmail,
     description,
     cancelled: /NOTA\s+CANCELADA|CANCELADA/i.test(t.slice(0, 600)),
     nfseUrl: buildNfseUrl(ccm, numero, codigo),
