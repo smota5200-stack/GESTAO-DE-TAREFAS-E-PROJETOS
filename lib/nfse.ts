@@ -2,7 +2,8 @@
 // Desde 01/11/2026 as notas (Simples Nacional) saem pelo Emissor Nacional (nfse.gov.br).
 // Notas antigas, emitidas na Prefeitura de São Paulo (Nota do Milhão), continuam sendo lidas.
 
-export const NFSE_PORTAL_URL = 'https://www.nfse.gov.br/EmissorNacional';
+// Login do Emissor Nacional; depois de entrar, o portal segue direto para a tela de emissão (DPS/NFSe).
+export const NFSE_PORTAL_URL = 'https://www.nfse.gov.br/EmissorNacional/Login?ReturnUrl=%2femissornacional%2fDPS%2fNFSe%2fIndex%3fidr%3dU1ZSSlVlUGF1Y1BGUHp3Z2k2dS9YUT090&idr=U1ZSSlVlUGF1Y1BGUHp3Z2k2dS9YUT090';
 export const NFSE_LEGACY_PORTAL_URL = 'https://nfe.prefeitura.sp.gov.br/';
 
 export interface ParsedNfse {
