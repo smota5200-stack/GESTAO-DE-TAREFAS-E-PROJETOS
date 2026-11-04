@@ -145,7 +145,8 @@ export interface ServiceInvoice {
   issueDate: string;
   fileUrl: string;
   createdAt: string;
-  // Campos da NFS-e (Nota do Milhão)
+  // Campos da NFS-e (Emissor Nacional; notas antigas: Nota do Milhão da Prefeitura de SP)
+  // verificationCode: chave de acesso de 50 dígitos (nacional) ou código de verificação (Prefeitura)
   verificationCode?: string;
   issuedAt?: string;
   issAmount?: number;

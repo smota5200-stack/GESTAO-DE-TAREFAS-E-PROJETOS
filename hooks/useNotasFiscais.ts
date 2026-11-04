@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { ServiceInvoice } from '../types';
-import { ParsedNfse, nfseBaseName, nfseFolder } from '../lib/nfse';
+import { ParsedNfse, nfseBaseName, nfseFolder, isAccessKey } from '../lib/nfse';
 
 export const NF_BUCKET = 'notas-fiscais';
 
@@ -87,7 +87,12 @@ export function useNotasFiscais() {
     };
 
     // Se a mesma nota já foi importada, atualiza em vez de duplicar
-    const existing = invoices.find(i => i.invoiceNumber.replace(/^0+/, '') === n.invoiceNumber.replace(/^0+/, '') && (!n.providerCcm || !i.providerCcm || i.providerCcm === n.providerCcm));
+    // Notas do Emissor Nacional têm chave de acesso única; a numeração reinicia em relação à Prefeitura,
+    // então o número sozinho não identifica a nota.
+    const norm = (v: string) => (v || '').replace(/^0+/, '');
+    const existing = isAccessKey(n.verificationCode)
+      ? invoices.find(i => i.verificationCode === n.verificationCode)
+      : invoices.find(i => !isAccessKey(i.verificationCode || '') && norm(i.invoiceNumber) === norm(n.invoiceNumber) && (!n.providerCcm || !i.providerCcm || i.providerCcm === n.providerCcm));
     const query = existing
       ? supabase.from('service_invoices').update({ ...row, file_path: filePath || existing.filePath, xml_path: xmlPath || existing.xmlPath }).eq('id', existing.id)
       : supabase.from('service_invoices').insert(row);

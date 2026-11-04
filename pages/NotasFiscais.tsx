@@ -7,8 +7,9 @@ import { ActionToolbar, Toast, useToast } from '../components/ActionToolbar';
 import { elementToPdf, saveToDrive, getDriveFolder, downloadBlob, DriveFile } from '../lib/driveFolder';
 import {
   NFSE_PORTAL_URL, ParsedNfse, emptyParsed, parseNfseXml, parseNfsePdf, parseNfseLink,
-  buildNfseUrl, formatDoc, onlyDigits, nfseBaseName, nfseFolder, openExternal,
+  buildNfseUrl, formatDoc, onlyDigits, nfseBaseName, nfseFolder, openExternal, isAccessKey,
 } from '../lib/nfse';
+import { NFSE_SERVICE_CODES, NFSE_STEPS, buildInvoiceEmail } from '../lib/nfseCodes';
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const brl = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
@@ -31,6 +32,8 @@ const NotasFiscais: React.FC = () => {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [busy, setBusy] = useState<'save' | 'pdf' | 'drive' | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
+  const [codesOpen, setCodesOpen] = useState(false);
+  const [sendingId, setSendingId] = useState<string | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
   const { toast, show } = useToast();
 
@@ -90,6 +93,42 @@ const NotasFiscais: React.FC = () => {
   const handleDelete = async (inv: ServiceInvoice) => {
     if (!confirm(`Excluir a NF ${inv.invoiceNumber} e os arquivos guardados? (Isso não cancela a nota na Prefeitura.)`)) return;
     try { await deleteInvoice(inv); } catch (e: any) { alert(e.message); }
+  };
+
+  /** Baixa XML + PDF e abre o e-mail (Gmail) para o cliente, com o texto pronto. O anexo é manual. */
+  const sendToClient = async (inv: ServiceInvoice) => {
+    setSendingId(inv.id);
+    try {
+      const client = clients.find(c => c.id === inv.clientId);
+      const to = client?.email || inv.takerEmail || '';
+      const takerName = inv.takerName || clientName(inv.clientId);
+      const { subject, body } = buildInvoiceEmail({
+        number: String(inv.invoiceNumber).replace(/^0+/, '') || inv.invoiceNumber,
+        takerName,
+        issueDate: inv.issueDate,
+        amount: brl(inv.amount),
+        senderName: 'Studio Mota',
+      });
+      // 1) baixa os arquivos guardados (PDF e XML) para anexar
+      for (const path of [inv.filePath, inv.xmlPath]) {
+        if (!path) continue;
+        await openExternal(await fileUrl(path, path.split('/').pop()));
+        await new Promise(r => setTimeout(r, 700));
+      }
+      // 2) abre o e-mail já escrito
+      const q = new URLSearchParams({ view: 'cm', fs: '1', to, su: subject, body });
+      await openExternal(`https://mail.google.com/mail/?${q.toString()}`);
+      show({ type: 'info', text: inv.filePath && inv.xmlPath ? 'Baixei o PDF e o XML. Anexe os dois no e-mail que abriu.' : 'E-mail aberto. Anexe o PDF e o XML da nota (importe os dois para o app guardar ambos).' });
+    } catch (e: any) {
+      show({ type: 'error', text: `Não consegui preparar o e-mail: ${e.message}` });
+    } finally {
+      setSendingId(null);
+    }
+  };
+
+  const copy = async (text: string, what: string) => {
+    try { await navigator.clipboard.writeText(text); show({ type: 'ok', text: `${what} copiado.` }); }
+    catch { show({ type: 'error', text: 'Não consegui copiar. Selecione o texto e use Cmd+C.' }); }
   };
 
   const periodLabel = year === 'todos' ? 'Todos os anos' : year;
@@ -218,7 +257,7 @@ const NotasFiscais: React.FC = () => {
       {/* Barra de ações */}
       <ActionToolbar
         title="Notas Fiscais"
-        subtitle="NFS-e emitidas na Prefeitura de São Paulo, organizadas por mês."
+        subtitle="NFS-e emitidas pelo Emissor Nacional (nfse.gov.br), organizadas por mês."
         driveKey="notas"
         saveLabel="Salvar nota"
         onSave={() => setImportOpen(true)}
@@ -231,7 +270,7 @@ const NotasFiscais: React.FC = () => {
         busy={busy}
         extra={
           <button onClick={() => openExternal(NFSE_PORTAL_URL)} className="h-10 px-4 text-sm font-bold text-slate-900 bg-primary rounded-lg hover:brightness-95 flex items-center gap-2 whitespace-nowrap">
-            <span className="material-symbols-outlined text-[18px]">open_in_new</span> Emitir na Prefeitura
+            <span className="material-symbols-outlined text-[18px]">open_in_new</span> Emitir no Portal Nacional
           </button>
         }
       />
@@ -239,8 +278,8 @@ const NotasFiscais: React.FC = () => {
       {/* Fluxo de emissão */}
       <div className="rounded-2xl border border-slate-200 dark:border-white/5 bg-white dark:bg-surface-dark p-5 grid md:grid-cols-3 gap-4">
         {[
-          { icon: 'account_balance', title: 'Emita no portal', text: 'Entre com sua Senha Web na Nota do Milhão e emita a NFS-e normalmente.', action: () => openExternal(NFSE_PORTAL_URL), cta: 'Abrir portal' },
-          { icon: 'download', title: 'Baixe o PDF ou XML', text: 'Na tela da nota, salve o PDF (Imprimir → PDF) ou exporte o XML. O link do e-mail também serve.' },
+          { icon: 'account_balance', title: 'Emita no Emissor Nacional', text: 'Entre no nfse.gov.br (usuário e senha, certificado ou gov.br) e use Emissão Completa.', action: () => openExternal(NFSE_PORTAL_URL), cta: 'Abrir portal' },
+          { icon: 'download', title: 'Baixe o XML e o PDF', text: 'Ao final da emissão, salve os dois arquivos. O link da consulta pública da nota também serve.' },
           { icon: 'drive_folder_upload', title: 'Importe aqui', text: 'O app lê os dados, renomeia como "NF 000123 - Cliente" e guarda na pasta do mês.', action: () => setImportOpen(true), cta: 'Importar' },
         ].map((s, i) => (
           <div key={s.title} className="flex gap-3">
@@ -254,6 +293,59 @@ const NotasFiscais: React.FC = () => {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Códigos de serviço + roteiro */}
+      <div className="rounded-2xl border border-slate-200 dark:border-white/5 bg-white dark:bg-surface-dark overflow-hidden">
+        <button onClick={() => setCodesOpen(o => !o)} className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors">
+          <div className="flex items-center gap-3 text-left">
+            <span className="material-symbols-outlined text-primary">content_copy</span>
+            <div>
+              <p className="text-sm font-bold text-slate-900 dark:text-white">Códigos para emitir e roteiro passo a passo</p>
+              <p className="text-xs text-slate-400">Código de Tributação Nacional, NBS e descrição — com botão de copiar.</p>
+            </div>
+          </div>
+          <span className="material-symbols-outlined text-slate-400">{codesOpen ? 'expand_less' : 'expand_more'}</span>
+        </button>
+        {codesOpen && (
+          <div className="border-t border-slate-100 dark:border-white/5 p-5 space-y-5">
+            <div className="grid md:grid-cols-2 gap-4">
+              {NFSE_SERVICE_CODES.map(c => (
+                <div key={c.id} className="rounded-xl border border-slate-200 dark:border-white/10 p-4 space-y-3 bg-slate-50/50 dark:bg-black/10">
+                  <div>
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">{c.label}</p>
+                    <p className="text-[11px] text-slate-400">Antes na Prefeitura: {c.legacyCode} — {c.legacyLabel}</p>
+                  </div>
+                  {[
+                    { l: 'Código de Tributação Nacional', v: c.ctn, hint: c.ctnLabel },
+                    ...(c.cnm ? [{ l: 'Código Complementar Municipal', v: c.cnm, hint: 'Escolha o mais próximo na tela; em caso de dúvida, fale com a contabilidade.' }] : []),
+                    { l: 'Item da NBS', v: c.nbs, hint: c.nbsLabel },
+                    { l: 'Descrição do Serviço', v: c.defaultDescription, hint: 'Sem dados a informar, use "Serviços Prestados".' },
+                  ].map(f => (
+                    <div key={f.l} className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className={labelCls}>{f.l}</p>
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white tabular-nums">{f.v}</p>
+                        <p className="text-[11px] text-slate-400 line-clamp-2">{f.hint}</p>
+                      </div>
+                      <button onClick={() => copy(f.v, f.l)} title="Copiar" className="size-8 shrink-0 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-[18px]">content_copy</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <ol className="space-y-2">
+              {NFSE_STEPS.map((st, i) => (
+                <li key={st.title} className="flex gap-3">
+                  <span className="size-6 shrink-0 rounded-full bg-primary/20 text-slate-900 dark:text-primary text-xs font-bold flex items-center justify-center">{i + 1}</span>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed"><span className="font-bold text-slate-800 dark:text-slate-200">{st.title}.</span> {st.text}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
       </div>
 
       {/* KPIs */}
@@ -295,7 +387,7 @@ const NotasFiscais: React.FC = () => {
         <div className="rounded-2xl border-2 border-dashed border-slate-200 dark:border-white/10 py-16 text-center">
           <span className="material-symbols-outlined text-4xl text-slate-300 dark:text-slate-600">folder_open</span>
           <p className="text-sm font-semibold text-slate-600 dark:text-slate-300 mt-2">Nenhuma nota {search ? 'encontrada' : 'guardada ainda'}</p>
-          <p className="text-xs text-slate-400 mt-1">Emita na Prefeitura e importe o PDF ou XML aqui.</p>
+          <p className="text-xs text-slate-400 mt-1">Emita no Emissor Nacional e importe o XML e o PDF aqui.</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -338,7 +430,7 @@ const NotasFiscais: React.FC = () => {
                               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
                                 <span>{dateBR(inv.issueDate)}</span>
                                 {inv.takerDoc && <span>{formatDoc(inv.takerDoc)}</span>}
-                                {inv.verificationCode && <span>Cód. {inv.verificationCode}</span>}
+                                {inv.verificationCode && <span title={inv.verificationCode}>{isAccessKey(inv.verificationCode) ? `Chave …${inv.verificationCode.slice(-8)}` : `Cód. ${inv.verificationCode}`}</span>}
                                 {inv.clientId && clientName(inv.clientId) ? (
                                   <Link to={`/clientes/${inv.clientId}`} className="text-slate-700 dark:text-primary hover:underline">{clientName(inv.clientId)}</Link>
                                 ) : (
@@ -358,7 +450,8 @@ const NotasFiscais: React.FC = () => {
                               {inv.filePath && <IconBtn icon="visibility" title="Abrir PDF" busy={busyId === inv.id + 'pdf'} onClick={() => openFile(inv, 'pdf')} />}
                               {inv.filePath && <IconBtn icon="download" title="Baixar PDF" onClick={() => openFile(inv, 'pdf', true)} />}
                               {inv.xmlPath && <IconBtn icon="code" title="Baixar XML" busy={busyId === inv.id + 'xml'} onClick={() => openFile(inv, 'xml', true)} />}
-                              {(inv.nfseUrl || inv.fileUrl) && <IconBtn icon="account_balance" title="Ver na Prefeitura" onClick={() => openExternal(inv.nfseUrl || inv.fileUrl)} />}
+                              {!cancelled && <IconBtn icon="mail" title="Enviar ao cliente (e-mail + XML e PDF)" busy={sendingId === inv.id} onClick={() => sendToClient(inv)} />}
+                              {(inv.nfseUrl || inv.fileUrl) && <IconBtn icon="account_balance" title={isAccessKey(inv.verificationCode || '') ? 'Ver no Portal Nacional' : 'Ver na Prefeitura'} onClick={() => openExternal(inv.nfseUrl || inv.fileUrl)} />}
                               <IconBtn icon="delete" title="Excluir do app" danger onClick={() => handleDelete(inv)} />
                             </div>
                           </div>
@@ -492,17 +585,17 @@ const ImportModal: React.FC<{
 
   const handleLink = () => {
     const p = parseNfseLink(link);
-    if (!p) { setMsg({ type: 'error', text: 'Link não reconhecido. Cole o link da nota (notaprint.aspx?ccm=…&nf=…&cod=…).' }); return; }
+    if (!p) { setMsg({ type: 'error', text: 'Link não reconhecido. Cole o link da consulta pública (…chave=…) ou, nas notas antigas, o da Prefeitura (notaprint.aspx?ccm=…).' }); return; }
     addParsed([p]);
     setLink('');
-    setMsg({ type: 'info', text: 'Link lido. Complete tomador e valor (ou solte também o PDF da nota).' });
+    setMsg({ type: 'info', text: 'Link lido. O link só traz a chave de acesso: solte também o XML da nota para preencher número, tomador e valor.' });
   };
 
   const update = (key: string, patch: Partial<ParsedNfse>) =>
     setPending(prev => prev.map(p => {
       if (p.key !== key) return p;
       const data = { ...p.data, ...patch };
-      if (('invoiceNumber' in patch || 'verificationCode' in patch || 'providerCcm' in patch) && (!p.data.nfseUrl || p.data.nfseUrl.includes('notaprint'))) {
+      if (('invoiceNumber' in patch || 'verificationCode' in patch || 'providerCcm' in patch) && (!p.data.nfseUrl || p.data.nfseUrl.includes('notaprint') || p.data.nfseUrl.includes('ConsultaPublica'))) {
         data.nfseUrl = buildNfseUrl(data.providerCcm, data.invoiceNumber, data.verificationCode) || data.nfseUrl;
       }
       return { ...p, data };
@@ -536,7 +629,7 @@ const ImportModal: React.FC<{
         <div className="px-6 py-5 border-b border-slate-100 dark:border-white/5 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold text-slate-900 dark:text-white">Importar nota emitida</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">PDF, XML ou link — o app preenche os dados e guarda uma cópia com o nome da nota.</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">XML e PDF do Emissor Nacional (ou link da consulta) — o app preenche os dados e guarda uma cópia com o nome da nota.</p>
           </div>
           <button onClick={onClose} className="size-9 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 flex items-center justify-center"><span className="material-symbols-outlined">close</span></button>
         </div>
@@ -560,7 +653,7 @@ const ImportModal: React.FC<{
           <div className="flex gap-2">
             <div className="relative flex-1">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">link</span>
-              <input value={link} onChange={e => setLink(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLink()} placeholder="…ou cole o link da nota (do e-mail da Prefeitura)" className={`${inputCls} pl-9`} />
+              <input value={link} onChange={e => setLink(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLink()} placeholder="…ou cole o link da consulta pública da nota" className={`${inputCls} pl-9`} />
             </div>
             <button onClick={handleLink} disabled={!link.trim()} className="px-4 rounded-xl text-sm font-semibold border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 hover:border-primary disabled:opacity-40">Ler link</button>
           </div>
@@ -596,7 +689,7 @@ const ImportModal: React.FC<{
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <label><span className={labelCls}>Nº da nota</span><input className={inputCls} value={d.invoiceNumber} onChange={e => update(p.key, { invoiceNumber: e.target.value })} /></label>
                       <label><span className={labelCls}>Emissão</span><input type="date" className={inputCls} value={d.issueDate} onChange={e => update(p.key, { issueDate: e.target.value })} /></label>
-                      <label><span className={labelCls}>Cód. verificação</span><input className={inputCls} value={d.verificationCode} onChange={e => update(p.key, { verificationCode: e.target.value.toUpperCase() })} /></label>
+                      <label className={d.verificationCode.length > 12 ? 'col-span-2 md:col-span-4' : ''}><span className={labelCls}>{d.verificationCode.length > 12 ? 'Chave de acesso' : 'Cód. verificação'}</span><input className={`${inputCls} tabular-nums`} value={d.verificationCode} onChange={e => update(p.key, { verificationCode: e.target.value.toUpperCase() })} /></label>
                       <label><span className={labelCls}>Valor (R$)</span><input type="number" step="0.01" className={`${inputCls} tabular-nums`} value={d.amount} onChange={e => update(p.key, { amount: Number(e.target.value) })} /></label>
                       <label className="col-span-2"><span className={labelCls}>Tomador</span><input className={inputCls} value={d.takerName} onChange={e => update(p.key, { takerName: e.target.value })} /></label>
                       <label><span className={labelCls}>CPF/CNPJ</span><input className={inputCls} value={formatDoc(d.takerDoc)} onChange={e => update(p.key, { takerDoc: e.target.value })} /></label>
