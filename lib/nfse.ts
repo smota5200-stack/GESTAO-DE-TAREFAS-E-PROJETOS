@@ -1,6 +1,9 @@
-// Utilitários para NFS-e da Prefeitura de São Paulo (Nota do Milhão)
+// Utilitários para NFS-e.
+// Desde 01/11/2026 as notas (Simples Nacional) saem pelo Emissor Nacional (nfse.gov.br).
+// Notas antigas, emitidas na Prefeitura de São Paulo (Nota do Milhão), continuam sendo lidas.
 
-export const NFSE_PORTAL_URL = 'https://nfe.prefeitura.sp.gov.br/';
+export const NFSE_PORTAL_URL = 'https://www.nfse.gov.br/EmissorNacional';
+export const NFSE_LEGACY_PORTAL_URL = 'https://nfe.prefeitura.sp.gov.br/';
 
 export interface ParsedNfse {
   invoiceNumber: string;
@@ -47,8 +50,16 @@ export const formatDoc = (doc: string) => {
   return doc;
 };
 
-/** Link público para visualizar/imprimir a nota no site da Prefeitura */
+/** Chave de acesso da NFS-e nacional: 50 dígitos */
+export const isAccessKey = (s: string) => /^\d{50}$/.test(onlyDigits(s));
+
+/** Link público para consultar uma nota do Emissor Nacional pela chave de acesso */
+export const buildNacionalUrl = (chave: string) =>
+  isAccessKey(chave) ? `https://www.nfse.gov.br/ConsultaPublica/?tpc=1&chave=${onlyDigits(chave)}` : '';
+
+/** Link público para visualizar a nota: Emissor Nacional (chave) ou, nas notas antigas, Prefeitura de SP */
 export const buildNfseUrl = (ccm: string, numero: string, codigo: string) => {
+  if (isAccessKey(codigo)) return buildNacionalUrl(codigo);
   const c = onlyDigits(ccm);
   const n = onlyDigits(numero).replace(/^0+/, '');
   const v = (codigo || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
@@ -60,6 +71,10 @@ export const buildNfseUrl = (ccm: string, numero: string, codigo: string) => {
 export function parseNfseLink(url: string): ParsedNfse | null {
   try {
     const u = new URL(url.trim());
+    const chave = onlyDigits(u.searchParams.get('chave') || u.searchParams.get('Chave') || '');
+    if (isAccessKey(chave)) {
+      return { ...emptyParsed(), verificationCode: chave, nfseUrl: buildNacionalUrl(chave), source: 'link' };
+    }
     const q = (k: string) => u.searchParams.get(k) || u.searchParams.get(k.toUpperCase()) || '';
     const ccm = q('ccm') || q('inscricao');
     const nf = q('nf') || q('numero');
@@ -91,11 +106,58 @@ const brDateToISO = (s: string) => {
   return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
 };
 
-/* ---------------- XML (exportação do portal / layout SP) ---------------- */
+/* ---------------- XML: Emissor Nacional (layout infNFSe/DPS) ---------------- */
+
+function parseNacionalXml(doc: Document, xmlText: string): ParsedNfse[] {
+  const infs = Array.from(doc.getElementsByTagNameNS('*', 'infNFSe'));
+
+  return infs
+    .map(inf => {
+      const first = (tag: string, parent: Element = inf) => parent.getElementsByTagNameNS('*', tag)[0] as Element | undefined;
+      const txt = (tag: string, parent: Element = inf) => first(tag, parent)?.textContent?.trim() || '';
+
+      const chave = onlyDigits((inf.getAttribute('Id') || '').replace(/^NFS/i, ''));
+      const dps = first('infDPS');
+      const prest = dps ? first('prest', dps) : undefined;
+      const toma = dps ? first('toma', dps) : undefined;
+
+      const emissao = (dps && txt('dhEmi', dps)) || txt('dhProc');
+      const takerDoc = toma ? (txt('CNPJ', toma) || txt('CPF', toma)) : '';
+      const valor = (dps && txt('vServ', dps)) || txt('vLiq');
+
+      const parsed: ParsedNfse = {
+        ...emptyParsed(),
+        invoiceNumber: txt('nNFSe'),
+        verificationCode: chave,
+        providerCcm: prest ? txt('IM', prest) : '',
+        issuedAt: emissao,
+        issueDate: emissao ? emissao.slice(0, 10) : emptyParsed().issueDate,
+        amount: brNumber(valor),
+        issAmount: brNumber(txt('vISSQN')),
+        takerName: toma ? txt('xNome', toma) : '',
+        takerDoc,
+        takerEmail: toma ? txt('email', toma).toLowerCase() : '',
+        description: dps ? txt('xDescServ', dps) : '',
+        cancelled: false, // cancelamento no padrão nacional é um evento à parte, não vem neste XML
+        nfseUrl: buildNacionalUrl(chave),
+        // Arquivo único: guarda o XML original (a assinatura digital não pode ser alterada)
+        xmlContent: infs.length === 1
+          ? xmlText
+          : `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(inf.parentElement || inf)}`,
+        source: 'xml',
+      };
+      return parsed;
+    })
+    .filter(p => p.invoiceNumber);
+}
+
+/* ---------------- XML (Emissor Nacional ou layout antigo da Prefeitura de SP) ---------------- */
 
 export function parseNfseXml(xmlText: string): ParsedNfse[] {
   const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
   if (doc.getElementsByTagName('parsererror').length) throw new Error('XML inválido');
+
+  if (doc.getElementsByTagNameNS('*', 'infNFSe').length) return parseNacionalXml(doc, xmlText);
 
   const nodes = Array.from(doc.getElementsByTagNameNS('*', 'NFe'));
   const list = nodes.length ? nodes : [doc.documentElement];
@@ -136,7 +198,8 @@ export function parseNfseXml(xmlText: string): ParsedNfse[] {
 
 /* ---------------- PDF (impressão da NFS-e) ---------------- */
 
-async function pdfToText(file: File): Promise<string> {
+/** gapMark: separa colunas distantes com TAB (usado no DANFSe nacional, que vem em linhas de colunas) */
+async function pdfToText(file: File, gapMark = false): Promise<string> {
   const pdfjs: any = await import('pdfjs-dist/legacy/build/pdf');
   const worker: any = await import('pdfjs-dist/legacy/build/pdf.worker.min.js?url');
   pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
@@ -147,19 +210,111 @@ async function pdfToText(file: File): Promise<string> {
     const page = await pdf.getPage(p);
     const content = await page.getTextContent();
     let lastY: number | null = null;
+    let lastEnd = 0;
     let line = '';
     for (const item of content.items as any[]) {
       const y = Math.round(item.transform[5]);
+      const x = item.transform[4] as number;
       if (lastY !== null && Math.abs(y - lastY) > 2) {
         if (line.trim()) lines.push(line.trim());
         line = '';
       }
-      line += (line && !line.endsWith(' ') ? ' ' : '') + item.str;
+      const bigGap = gapMark && line !== '' && x - lastEnd > 12;
+      line += (line && !line.endsWith(' ') ? (bigGap ? '\t' : ' ') : '') + item.str;
       lastY = y;
+      lastEnd = x + (item.width || 0);
     }
     if (line.trim()) lines.push(line.trim());
   }
   return lines.join('\n');
+}
+
+/**
+ * Lê o texto do DANFSe (PDF do Emissor Nacional). O texto sai campo a campo: uma linha com o
+ * RÓTULO e, logo depois, o VALOR. Por isso cada dado é buscado "na linha seguinte ao rótulo",
+ * dentro da seção certa (prestador, tomador...). Se o PDF vier em linhas de colunas, há um plano B.
+ */
+export function parseNacionalText(text: string): ParsedNfse {
+  const t = text.replace(/\r/g, '');
+  const lines = t.split('\n').map(l => l.trim()).filter(Boolean);
+  const idxLine = (re: RegExp, from = 0) => lines.findIndex((l, i) => i >= from && re.test(l));
+  const section = (startRe: RegExp, endRe?: RegExp) => {
+    const a = idxLine(startRe);
+    if (a < 0) return [] as string[];
+    const b = endRe ? idxLine(endRe, a + 1) : -1;
+    return lines.slice(a, b > a ? b : undefined);
+  };
+  /** valor na linha seguinte ao rótulo (só a primeira coluna, se vier mais de uma) */
+  const valueAfter = (labelRe: RegExp, sec: string[] = lines) => {
+    const i = sec.findIndex(l => labelRe.test(l));
+    return i >= 0 ? (sec[i + 1] || '').split('\t')[0].trim() : '';
+  };
+  const dash = (v: string) => (/^[-–—\s]*$/.test(v) ? '' : v);
+
+  const RE_CNPJ = /\b\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}\b/;
+  const RE_CPF = /\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/;
+  const RE_EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/;
+  const RE_LABEL = /^(N[ÚU]MERO|COMPET|DATA E HORA|S[ÉE]RIE|EMITENTE|SITUA|FINALIDADE|Nome \/|Munic|C[óo]digo|Endere|E-mail|Telefone|Indicador|CNPJ)/i;
+
+  const chave = t.match(/\b(\d{50})\b/)?.[1] || '';
+
+  // ---- número, competência e emissão ----
+  let numero = onlyDigits(valueAfter(/^N[ÚU]MERO DA NFS-?e/i));
+  const emissaoTxt = valueAfter(/^DATA E HORA DA EMISS[ÃA]O DA NFS-?e/i);
+  const competenciaTxt = valueAfter(/^COMPET[ÊE]NCIA DA NFS-?e/i);
+  let mEmissao = emissaoTxt.match(/(\d{2}\/\d{2}\/\d{4})\s+(\d{2}:\d{2}(?::\d{2})?)/);
+  let dataBR = mEmissao?.[1] || emissaoTxt.match(/\d{2}\/\d{2}\/\d{4}/)?.[0] || competenciaTxt.match(/\d{2}\/\d{2}\/\d{4}/)?.[0] || '';
+
+  // plano B: valores em uma só linha "1  04/11/2026  04/11/2026 10:48:10"
+  if (!numero || !dataBR) {
+    const iNum = idxLine(/^N[ÚU]MERO DA NFS-?e/i);
+    const row = iNum >= 0 ? lines[iNum + 1] || '' : '';
+    const m = row.match(/^(\d+)\s+(\d{2}\/\d{2}\/\d{4})\s+(\d{2}\/\d{2}\/\d{4})\s+(\d{2}:\d{2}(?::\d{2})?)/);
+    if (m) { numero = numero || m[1]; dataBR = dataBR || m[3]; mEmissao = mEmissao || [m[0], m[3], m[4]] as any; }
+  }
+  const issueDate = brDateToISO(dataBR);
+  const hora = mEmissao?.[2] || '';
+  const issuedAt = issueDate && hora ? `${issueDate}T${hora.length === 5 ? hora + ':00' : hora}` : '';
+
+  // ---- prestador e tomador ----
+  const prest = section(/^PRESTADOR/i, /^TOMADOR/i);
+  const toma = section(/^TOMADOR/i, /^(DESTINAT|INTERMEDI|SERVI[ÇC]O PRESTADO)/i);
+
+  const im = valueAfter(/^Indicador Municipal/i, prest).match(/\d{6,}/)?.[0] || '';
+
+  const nameRaw = dash(valueAfter(/^Nome \/ Nome Empresarial/i, toma));
+  const takerName = nameRaw && !RE_LABEL.test(nameRaw) ? nameRaw : '';
+  const tomaTxt = toma.join('\n');
+  const takerDoc = tomaTxt.match(RE_CNPJ)?.[0] || tomaTxt.match(RE_CPF)?.[0] || '';
+  const takerEmail = (valueAfter(/^E-mail/i, toma).match(RE_EMAIL)?.[0] || '').toLowerCase();
+
+  // ---- descrição: do rótulo até a tributação municipal ----
+  const iDesc = idxLine(/^Descri[çc][ãa]o do Servi[çc]o/i);
+  const iEnd = iDesc >= 0 ? idxLine(/^TRIBUTA[ÇC][ÃA]O MUNICIPAL/i, iDesc + 1) : -1;
+  const description = iDesc >= 0 ? lines.slice(iDesc + 1, iEnd > iDesc ? iEnd : iDesc + 3).join('\n') : '';
+
+  // ---- valor ----
+  const iVal = idxLine(/VALOR DA OPERA[ÇC][ÃA]O/i);
+  const amount = iVal >= 0 ? brNumber(lines.slice(iVal, iVal + 3).join(' ').match(/R\$\s*([\d.]+,\d{2})/)?.[1] || '') : 0;
+
+  const cancelled = /cancelad/i.test(valueAfter(/^SITUA[ÇC][ÃA]O DA NFS-?e/i));
+
+  return {
+    ...emptyParsed(),
+    invoiceNumber: numero,
+    verificationCode: chave,
+    providerCcm: im,
+    issueDate: issueDate || emptyParsed().issueDate,
+    issuedAt,
+    amount,
+    takerName,
+    takerDoc,
+    takerEmail,
+    description,
+    cancelled,
+    nfseUrl: buildNacionalUrl(chave),
+    source: 'pdf',
+  };
 }
 
 /**
@@ -172,6 +327,8 @@ async function pdfToText(file: File): Promise<string> {
  *   2) o valor solto dentro da seção certa (cabeçalho, prestador, tomador), por formato.
  */
 export function parseNfseText(text: string): ParsedNfse {
+  // DANFSe do Emissor Nacional (chave de acesso de 50 dígitos)
+  if (/DANFSe|CHAVE DE ACESSO DA NFS-?e/i.test(text) || /\b\d{50}\b/.test(text)) return parseNacionalText(text);
   const t = text.replace(/\r/g, '');
   const idx = (re: RegExp, from = 0) => {
     const m = t.slice(from).match(re);
@@ -258,7 +415,9 @@ export function parseNfseText(text: string): ParsedNfse {
 }
 
 export async function parseNfsePdf(file: File): Promise<ParsedNfse> {
-  const text = await pdfToText(file);
+  let text = await pdfToText(file);
+  // DANFSe nacional: relê separando as colunas
+  if (/DANFSe|CHAVE DE ACESSO DA NFS-?e/i.test(text) || /\b\d{50}\b/.test(text)) text = await pdfToText(file, true);
   return { ...parseNfseText(text), pdfFile: file };
 }
 
