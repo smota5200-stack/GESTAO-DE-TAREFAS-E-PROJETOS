@@ -19,6 +19,7 @@ import Reports from './pages/Reports';
 import Orcamentos from './pages/Orcamentos';
 import Files from './pages/Files';
 import NotasFiscais from './pages/NotasFiscais';
+import OrcamentoFoggiatto from './pages/OrcamentoFoggiatto';
 
 
 const App: React.FC = () => {
@@ -31,6 +32,7 @@ const App: React.FC = () => {
           <Route path="projetos" element={<Projects />} />
           <Route path="projetos/:id" element={<ProjectDetails />} />
           <Route path="orcamentos" element={<Orcamentos />} />
+          <Route path="orcamento-foggiatto" element={<OrcamentoFoggiatto />} />
           <Route path="relatorios" element={<Reports />} />
           <Route path="precos" element={<PriceTable />} />
           <Route path="financas" element={<Finances />} />
