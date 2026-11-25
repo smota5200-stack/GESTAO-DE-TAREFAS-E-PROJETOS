@@ -1200,15 +1200,15 @@ const ProjectDetails: React.FC = () => {
                            </div>
                         ) : (
                            attachments.map(file => (
-                              <div key={file.id} className="group relative flex items-center gap-3 bg-white dark:bg-white/5 border border-slate-100 dark:border-white/5 p-2 rounded-xl hover:border-primary/30 transition-all">
+                              <div key={file.id} onClick={() => { if (file.type === 'text/html') window.open(file.url, '_blank'); }} className={`group relative flex items-center gap-3 bg-white dark:bg-white/5 border border-slate-100 dark:border-white/5 p-2 rounded-xl hover:border-primary/30 transition-all ${file.type === 'text/html' ? 'cursor-pointer border-primary/40' : ''}`}>
                                  <div className={`size-10 rounded-lg flex items-center justify-center shrink-0 ${file.type.startsWith('image/') ? 'bg-emerald-500/10 text-emerald-500' : 'bg-blue-500/10 text-blue-500'}`}>
                                     <span className="material-symbols-outlined text-xl">
-                                       {file.type.startsWith('image/') ? 'image' : 'description'}
+                                       {file.type.startsWith('image/') ? 'image' : file.type === 'text/html' ? 'view_in_ar' : 'description'}
                                     </span>
                                  </div>
                                  <div className="flex-1 min-w-0 pr-6">
                                     <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">{file.name}</p>
-                                    <p className="text-[10px] text-slate-400">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                    <p className="text-[10px] text-slate-400">{file.type === 'text/html' ? 'Clique para abrir' : `${(file.size / 1024 / 1024).toFixed(2)} MB`}</p>
                                  </div>
                                  
                                  <div className="absolute right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
