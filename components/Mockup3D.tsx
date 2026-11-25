@@ -91,7 +91,7 @@ const Spin: React.FC<{ src: string; depth: number; label: string }> = ({ src, de
                 alt={k === N ? label : ''}
                 draggable={false}
                 style={{
-                  position: 'absolute', left: 0, top: 0, height: H, width: w,
+                  position: 'absolute', left: 0, top: 0, height: H, width: w, maxWidth: 'none',
                   marginLeft: -w / 2, marginTop: -H / 2 - 6,
                   transform: `translateZ(${z.toFixed(2)}px)`,
                   pointerEvents: 'none',
