@@ -104,9 +104,11 @@ export function useNotasFiscais() {
     return saved;
   };
 
-  const updateClient = async (id: string, clientId: string) => {
+  const updateClient = async (id: string, clientId: string): Promise<boolean> => {
     const { error } = await supabase.from('service_invoices').update({ client_id: clientId || null }).eq('id', id);
-    if (!error) setInvoices(prev => prev.map(i => (i.id === id ? { ...i, clientId } : i)));
+    if (error) return false;
+    setInvoices(prev => prev.map(i => (i.id === id ? { ...i, clientId } : i)));
+    return true;
   };
 
   const deleteInvoice = async (inv: ServiceInvoice) => {

@@ -20,6 +20,10 @@ const ClientDetails: React.FC = () => {
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [invoiceForm, setInvoiceForm] = useState({ invoiceNumber: '', description: '', amount: '', issueDate: '', fileUrl: '' });
 
+  const activeInvoices = invoices.filter(i => i.status !== 'cancelada');
+  const nfTotal = activeInvoices.reduce((acc, i) => acc + (i.amount || 0), 0);
+  const nfCount = activeInvoices.length;
+
   // Estado local para permitir edição da nota do cliente
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [notes, setNotes] = useState('');
@@ -339,7 +343,18 @@ const ClientDetails: React.FC = () => {
         <div className="col-span-1 lg:col-span-8 space-y-6">
 
           {/* Metrics Row */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+            <div className="bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/5 rounded-2xl p-6 shadow-sm flex items-center gap-4">
+              <div className="size-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined">receipt_long</span>
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Notas Emitidas</p>
+                <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-0.5">R$ {nfTotal.toFixed(2)}</h3>
+                <p className="text-[10px] text-slate-500">{nfCount} nota(s)</p>
+              </div>
+            </div>
+
             <div className="bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/5 rounded-2xl p-6 shadow-sm flex items-center gap-4">
               <div className="size-12 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
                 <span className="material-symbols-outlined">check_circle</span>

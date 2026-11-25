@@ -411,7 +411,7 @@ const ClientPanel: React.FC = () => {
 
                 {/* Footer */}
                 <div className="text-center py-6 text-xs text-slate-400">
-                    <p>Painel gerado por <span className="font-bold text-primary">FreelanceOS</span></p>
+                    <p>Painel gerado por <span className="font-bold text-primary">Studio Mota</span></p>
                 </div>
             </main>
 

@@ -17,6 +17,9 @@ interface KanbanTask {
 const Kanban: React.FC = () => {
   const [tasks, setTasks] = useState<KanbanTask[]>([]);
   const [loading, setLoading] = useState(true);
+  const [toDelete, setToDelete] = useState<{ ids: string[]; label: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   // Statuses list
   const statuses: KanbanStatus[] = [
@@ -110,6 +113,24 @@ const Kanban: React.FC = () => {
     }
   };
 
+  /** Exclui cards (demandas) do banco e tira o estado salvo do Kanban */
+  const confirmDelete = async () => {
+    if (!toDelete) return;
+    setDeleting(true);
+    setDeleteError('');
+    const { error } = await supabase.from('project_demands').delete().in('id', toDelete.ids);
+    setDeleting(false);
+    if (error) {
+      setDeleteError(`Não consegui excluir: ${error.message}`);
+      return;
+    }
+    const saved = JSON.parse(localStorage.getItem('kanban_states') || '{}');
+    toDelete.ids.forEach(id => { delete saved[id]; });
+    localStorage.setItem('kanban_states', JSON.stringify(saved));
+    setTasks(prev => prev.filter(t => !toDelete.ids.includes(t.id)));
+    setToDelete(null);
+  };
+
   return (
     <div className="h-full flex flex-col animate-in fade-in duration-500">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between shrink-0">
@@ -137,9 +158,20 @@ const Kanban: React.FC = () => {
                   <div className={`w-3 h-3 rounded-full ${statusColors[status]}`}></div>
                   <h3 className="font-bold text-sm text-slate-700 dark:text-slate-200">{status}</h3>
                 </div>
-                <span className="text-xs font-black text-slate-400 bg-slate-100 dark:bg-white/10 px-2 py-0.5 rounded-full">
-                  {tasks.filter(t => t.kanbanStatus === status).length}
-                </span>
+                <div className="flex items-center gap-2">
+                  {tasks.some(t => t.kanbanStatus === status) && (
+                    <button
+                      title="Excluir todos os cards desta coluna"
+                      onClick={() => setToDelete({ ids: tasks.filter(t => t.kanbanStatus === status).map(t => t.id), label: `todos os ${tasks.filter(t => t.kanbanStatus === status).length} card(s) de "${status}"` })}
+                      className="p-1 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[18px] block">delete_sweep</span>
+                    </button>
+                  )}
+                  <span className="text-xs font-black text-slate-400 bg-slate-100 dark:bg-white/10 px-2 py-0.5 rounded-full">
+                    {tasks.filter(t => t.kanbanStatus === status).length}
+                  </span>
+                </div>
               </div>
 
               {/* Lista de Cards */}
@@ -154,7 +186,14 @@ const Kanban: React.FC = () => {
                     <div className={`absolute top-0 left-0 w-1 h-full rounded-l-xl opacity-0 group-hover:opacity-100 transition-opacity ${statusColors[task.kanbanStatus]}`}></div>
                     <div className="flex justify-between items-start mb-2">
                       <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-tight pr-4">{task.title}</h4>
-                      <span className="material-symbols-outlined text-[14px] text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity">drag_indicator</span>
+                      <button
+                        title="Excluir card"
+                        draggable={false}
+                        onClick={(e) => { e.stopPropagation(); setToDelete({ ids: [task.id], label: `o card "${task.title}"` }); }}
+                        className="-mt-1 -mr-1 p-1 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all shrink-0"
+                      >
+                        <span className="material-symbols-outlined text-[16px] block">delete</span>
+                      </button>
                     </div>
                     <p className="text-[11px] font-medium text-slate-500 mb-2 truncate">{task.projectName}</p>
                     {task.origem && (
@@ -200,6 +239,26 @@ const Kanban: React.FC = () => {
           ))}
         </div>
       </div>
+
+      {toDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => !deleting && setToDelete(null)}>
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/10 shadow-2xl p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <span className="material-symbols-outlined text-red-500">warning</span> Excluir do Kanban
+            </h3>
+            <p className="text-sm text-slate-600 dark:text-slate-300 mt-3">
+              Vai excluir {toDelete.label}. A demanda também some do projeto e das Finanças. Não dá para desfazer.
+            </p>
+            {deleteError && <p className="text-sm text-red-500 mt-3">{deleteError}</p>}
+            <div className="flex justify-end gap-2 mt-6">
+              <button onClick={() => setToDelete(null)} disabled={deleting} className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5">Cancelar</button>
+              <button onClick={confirmDelete} disabled={deleting} className="px-4 py-2 rounded-xl text-sm font-bold bg-red-500 text-white hover:bg-red-600 disabled:opacity-60">
+                {deleting ? 'Excluindo…' : 'Excluir definitivamente'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

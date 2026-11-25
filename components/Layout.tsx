@@ -124,11 +124,15 @@ const Layout: React.FC = () => {
       <aside className={`${sidebarCollapsed ? 'w-[72px]' : 'w-64'} flex-shrink-0 border-r border-primary/10 bg-white dark:bg-surface-dark flex flex-col z-30 shadow-xl shadow-black/5 absolute inset-y-0 left-0 transform transition-all duration-300 md:relative md:translate-x-0 ${mobileMenuOpen ? 'translate-x-0 !w-64' : '-translate-x-full'}`}>
         <div className={`p-6 flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'} gap-3`}>
           <div className="flex items-center gap-2 w-full justify-center md:justify-start">
-            <span className="text-[#CCFF00] flex items-center shrink-0">
-               <span className="material-symbols-outlined text-3xl !font-[700]" style={{ fontVariationSettings: "'FILL' 1" }}>flare</span>
-            </span>
-            {!sidebarCollapsed && (
-              <span className="text-[#CCFF00] text-xl font-bold tracking-tight uppercase hidden md:inline-block">FREE LANCE OS</span>
+            {/* Logo Studio Mota (fundo branco para manter o contraste no tema escuro) */}
+            {sidebarCollapsed ? (
+              <span className="flex items-center justify-center shrink-0 rounded-lg bg-white p-1 w-11 h-9">
+                <img src="/studio-mota-mark.png" alt="Studio Mota" className="max-h-full max-w-full object-contain" />
+              </span>
+            ) : (
+              <span className="flex items-center shrink-0 rounded-xl bg-white px-3 py-1.5">
+                <img src="/logo.png" alt="Studio Mota" className="h-12 w-auto object-contain" />
+              </span>
             )}
           </div>
           <button className="md:hidden text-slate-500" onClick={() => setMobileMenuOpen(false)}>

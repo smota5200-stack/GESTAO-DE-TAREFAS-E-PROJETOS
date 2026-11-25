@@ -41,7 +41,7 @@ const PasswordGate: React.FC<PasswordGateProps> = ({ children }) => {
           </div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Acesso Restrito</h1>
           <p className="text-slate-500 dark:text-slate-400 text-center mt-2">
-            Digite a senha para acessar o painel administrativo do FreelaOS.
+            Digite a senha para acessar o painel administrativo do Studio Mota.
           </p>
         </div>
 

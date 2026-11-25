@@ -64,6 +64,23 @@ const Clients: React.FC = () => {
     fetchTotals();
   }, [clients]);
 
+  // Notas fiscais emitidas por cliente (valor e quantidade), sem as canceladas
+  const [nfTotals, setNfTotals] = useState<Record<string, { total: number; count: number }>>({});
+  useEffect(() => {
+    const fetchNf = async () => {
+      const { data } = await supabase.from('service_invoices').select('client_id, amount, status').not('client_id', 'is', null);
+      const totals: Record<string, { total: number; count: number }> = {};
+      (data || []).forEach((r: any) => {
+        if (r.status === 'cancelada') return;
+        const cur = totals[r.client_id] || { total: 0, count: 0 };
+        totals[r.client_id] = { total: cur.total + (parseFloat(r.amount) || 0), count: cur.count + 1 };
+      });
+      setNfTotals(totals);
+    };
+    fetchNf();
+  }, [clients]);
+  const brl = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
+
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').substring(0, 2);
   };
@@ -156,7 +173,8 @@ const Clients: React.FC = () => {
                 <th className="px-6 py-4">Empresa</th>
                 <th className="px-6 py-4">CPF/CNPJ</th>
                 <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Total Gasto</th>
+                <th className="px-6 py-4 text-right">Demandas (R$)</th>
+                <th className="px-6 py-4 text-right">Notas emitidas</th>
                 <th className="px-6 py-4 text-center">Ações</th>
               </tr>
             </thead>
@@ -187,7 +205,11 @@ const Clients: React.FC = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right font-black text-sm text-slate-900 dark:text-white whitespace-nowrap">
-                    R$ {(clientTotals[client.id] || 0).toFixed(2)}
+                    {brl(clientTotals[client.id] || 0)}
+                  </td>
+                  <td className="px-6 py-4 text-right whitespace-nowrap">
+                    <span className="block font-black text-sm text-slate-900 dark:text-white">{brl(nfTotals[client.id]?.total || 0)}</span>
+                    <span className="text-[10px] text-slate-500">{nfTotals[client.id]?.count || 0} nota(s)</span>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-center gap-2">

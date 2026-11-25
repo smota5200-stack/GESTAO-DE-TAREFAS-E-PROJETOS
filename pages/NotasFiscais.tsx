@@ -15,6 +15,30 @@ const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Jul
 const brl = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
 const dateBR = (iso: string) => (iso ? iso.slice(0, 10).split('-').reverse().join('/') : '—');
 
+/** Normaliza texto para comparar nomes (sem acento, caixa ou pontuação) */
+const normName = (s?: string) =>
+  (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+type CrossMatch = { invoice: ServiceInvoice; clientId: string; by: 'CNPJ/CPF' | 'nome' };
+
+/** Procura o cliente de uma nota pelo CNPJ/CPF do tomador e, se não achar, pelo nome (igual, sem acento/caixa) */
+const findClientForInvoice = (
+  clients: { id: string; name: string; company: string; cpfCnpj: string }[],
+  inv: ServiceInvoice,
+): { id: string; by: CrossMatch['by'] } | null => {
+  const d = onlyDigits(inv.takerDoc || '');
+  if (d.length >= 11) {
+    const byDoc = clients.find(c => onlyDigits(c.cpfCnpj || '') === d);
+    if (byDoc) return { id: byDoc.id, by: 'CNPJ/CPF' };
+  }
+  const n = normName(inv.takerName);
+  if (n) {
+    const byName = clients.find(c => [c.company, c.name].some(x => normName(x) === n));
+    if (byName) return { id: byName.id, by: 'nome' };
+  }
+  return null;
+};
+
 const inputCls =
   'w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 outline-none focus:border-primary focus:ring-2 focus:ring-primary/30 transition-all';
 const labelCls = 'block text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5';
@@ -34,6 +58,8 @@ const NotasFiscais: React.FC = () => {
   const [reportOpen, setReportOpen] = useState(false);
   const [codesOpen, setCodesOpen] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [crossOpen, setCrossOpen] = useState(false);
+  const [crossBusy, setCrossBusy] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
   const { toast, show } = useToast();
 
@@ -58,6 +84,34 @@ const NotasFiscais: React.FC = () => {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invoices, search, year, clients]);
+
+  /** Notas sem cliente vinculado e o cliente que o app encontrou para cada uma */
+  const unlinked = useMemo(() => invoices.filter(i => !i.clientId), [invoices]);
+  const crossMatches = useMemo<CrossMatch[]>(() => {
+    const out: CrossMatch[] = [];
+    unlinked.forEach(inv => {
+      const m = findClientForInvoice(clients, inv);
+      if (m) out.push({ invoice: inv, clientId: m.id, by: m.by });
+    });
+    return out;
+  }, [unlinked, clients]);
+
+  const applyCross = async () => {
+    setCrossBusy(true);
+    try {
+      let ok = 0;
+      for (const m of crossMatches) if (await updateClient(m.invoice.id, m.clientId)) ok++;
+      const failed = crossMatches.length - ok;
+      show(failed
+        ? { type: 'error', text: `${ok} nota(s) vinculada(s); ${failed} falharam ao salvar.` }
+        : { type: 'ok', text: `${ok} nota(s) vinculada(s) aos clientes.` });
+      setCrossOpen(false);
+    } catch (e: any) {
+      show({ type: 'error', text: e?.message || 'Não consegui vincular as notas.' });
+    } finally {
+      setCrossBusy(false);
+    }
+  };
 
   const groups = useMemo(() => {
     const map = new Map<string, ServiceInvoice[]>();
@@ -348,6 +402,43 @@ const NotasFiscais: React.FC = () => {
         )}
       </div>
 
+      {/* Cruzar notas × clientes */}
+      {crossOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => !crossBusy && setCrossOpen(false)}>
+          <div className="w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col rounded-2xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/10 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="p-5 border-b border-slate-200 dark:border-white/10">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Cruzar notas com clientes</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                {unlinked.length} nota(s) sem cliente. O app comparou o CNPJ/CPF e o nome do tomador com o cadastro de clientes.
+              </p>
+            </div>
+            <div className="p-5 overflow-y-auto custom-scrollbar space-y-2">
+              {crossMatches.length === 0 ? (
+                <p className="text-sm text-slate-600 dark:text-slate-300">Nenhuma nota sem cliente bateu com o cadastro. Cadastre o cliente (com CNPJ/CPF) ou vincule manualmente pela lista.</p>
+              ) : crossMatches.map(m => (
+                <div key={m.invoice.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-white/10 px-3 py-2 text-sm">
+                  <span className="text-slate-700 dark:text-slate-200">NF {m.invoice.invoiceNumber} · {m.invoice.takerName || m.invoice.takerDoc || '—'}</span>
+                  <span className="text-right text-slate-900 dark:text-primary font-semibold">
+                    → {clientName(m.clientId)} <span className="text-[10px] font-normal text-slate-500">(por {m.by})</span>
+                  </span>
+                </div>
+              ))}
+              {unlinked.length - crossMatches.length > 0 && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 pt-2">
+                  {unlinked.length - crossMatches.length} nota(s) continuam sem cliente porque não há cadastro correspondente.
+                </p>
+              )}
+            </div>
+            <div className="p-4 border-t border-slate-200 dark:border-white/10 flex justify-end gap-2">
+              <button onClick={() => setCrossOpen(false)} disabled={crossBusy} className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5">Cancelar</button>
+              <button onClick={applyCross} disabled={crossBusy || crossMatches.length === 0} className="px-4 py-2 rounded-xl text-sm font-bold bg-primary text-black disabled:opacity-50">
+                {crossBusy ? 'Vinculando…' : `Vincular ${crossMatches.length} nota(s)`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
@@ -372,6 +463,15 @@ const NotasFiscais: React.FC = () => {
           {years.map(y => <option key={y} value={y}>{y}</option>)}
           <option value="todos">Todos os anos</option>
         </select>
+        <button
+          onClick={() => setCrossOpen(true)}
+          disabled={unlinked.length === 0}
+          title="Liga as notas já cadastradas aos clientes pelo CNPJ/CPF ou nome do tomador"
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-surface-dark px-4 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:border-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all whitespace-nowrap"
+        >
+          <span className="material-symbols-outlined text-[18px]">link</span>
+          Cruzar com clientes{unlinked.length > 0 ? ` (${unlinked.length} sem cliente)` : ''}
+        </button>
       </div>
 
       {error && (

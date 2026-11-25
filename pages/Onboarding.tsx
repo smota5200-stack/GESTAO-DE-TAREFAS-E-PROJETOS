@@ -124,7 +124,7 @@ const Onboarding: React.FC = () => {
              <div className="size-6 bg-primary rounded shadow-lg shadow-primary/30 flex items-center justify-center text-slate-900 shrink-0">
                <span className="material-symbols-outlined text-sm">auto_awesome</span>
              </div>
-             <span className="font-bold text-xl tracking-tight text-slate-900">FreelanceOS</span>
+             <span className="font-bold text-xl tracking-tight text-slate-900">Studio Mota</span>
           </div>
         </div>
       </header>

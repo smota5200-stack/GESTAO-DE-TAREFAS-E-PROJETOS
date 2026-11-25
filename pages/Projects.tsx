@@ -6,10 +6,33 @@ import { supabase } from '../lib/supabaseClient';
 import { Project } from '../types';
 
 const Projects: React.FC = () => {
-  const { projects, loading, createProject } = useProjects();
+  const { projects, loading, createProject, fetchProjects } = useProjects();
   const { clients } = useClients();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Exclusão / limpeza de projetos
+  const [selected, setSelected] = useState<string[]>([]);
+  const [toDelete, setToDelete] = useState<string[] | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const allSelected = projects.length > 0 && selected.length === projects.length;
+  const toggleOne = (id: string) => setSelected(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
+
+  const confirmDelete = async () => {
+    if (!toDelete) return;
+    setDeleting(true);
+    setDeleteError('');
+    const { error } = await supabase.from('projects').delete().in('id', toDelete);
+    setDeleting(false);
+    if (error) {
+      setDeleteError(`Não consegui excluir: ${error.message}`);
+      return;
+    }
+    setSelected(prev => prev.filter(id => !toDelete.includes(id)));
+    setToDelete(null);
+    await fetchProjects();
+  };
 
   // Estados para o Modal de Novo Projeto
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
@@ -128,7 +151,24 @@ const Projects: React.FC = () => {
             <span className="material-symbols-outlined text-sm text-slate-400">expand_more</span>
           </div>
         ))}
-        <button onClick={() => alert('Filtros resetados.')} className="ml-auto text-sm font-bold text-primary hover:underline">Limpar filtros</button>
+        <div className="ml-auto flex items-center gap-3">
+          {selected.length > 0 && (
+            <button onClick={() => setToDelete(selected)} className="flex items-center gap-1.5 rounded-lg bg-red-500/10 text-red-500 px-3 py-1.5 text-sm font-bold hover:bg-red-500/20 transition-colors">
+              <span className="material-symbols-outlined text-[18px]">delete</span>
+              Excluir selecionados ({selected.length})
+            </button>
+          )}
+          <button
+            onClick={() => projects.length > 0 && setToDelete(projects.map(p => p.id))}
+            disabled={projects.length === 0}
+            title="Excluir todos os projetos da lista"
+            className="flex items-center gap-1.5 rounded-lg border border-red-500/30 text-red-500 px-3 py-1.5 text-sm font-bold hover:bg-red-500/10 disabled:opacity-40 transition-colors"
+          >
+            <span className="material-symbols-outlined text-[18px]">delete_sweep</span>
+            Limpar projetos
+          </button>
+          <button onClick={() => alert('Filtros resetados.')} className="text-sm font-bold text-primary hover:underline">Limpar filtros</button>
+        </div>
       </div>
 
       {/* Lista de Projetos */}
@@ -137,6 +177,7 @@ const Projects: React.FC = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/80 dark:bg-black/20 border-b border-slate-200 dark:border-white/5 text-xs font-bold uppercase text-slate-500 tracking-wider">
+                <th className="pl-6 pr-0 py-4 w-8"><input type="checkbox" aria-label="Selecionar todos" checked={allSelected} onChange={() => setSelected(allSelected ? [] : projects.map(p => p.id))} className="accent-[#CCFF00] cursor-pointer" /></th>
                 <th className="px-6 py-4">Projeto</th>
                 <th className="px-6 py-4">Cliente</th>
                 <th className="px-6 py-4">Status</th>
@@ -148,6 +189,9 @@ const Projects: React.FC = () => {
             <tbody className="divide-y divide-slate-100 dark:divide-white/5">
               {projects.map((project) => (
                 <tr key={project.id} onClick={() => navigate(`/projetos/${project.id}`)} className="hover:bg-slate-50/80 dark:hover:bg-white/[0.02] transition-colors group cursor-pointer">
+                  <td className="pl-6 pr-0 py-4 w-8" onClick={e => e.stopPropagation()}>
+                    <input type="checkbox" aria-label={`Selecionar ${project.title}`} checked={selected.includes(project.id)} onChange={() => toggleOne(project.id)} className="accent-[#CCFF00] cursor-pointer" />
+                  </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col gap-1">
                       <span className="block text-sm font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">{project.title}</span>
@@ -188,12 +232,7 @@ const Projects: React.FC = () => {
                         <span className="material-symbols-outlined text-[18px]">open_in_new</span>
                       </button>
                       <button
-                        onClick={async () => {
-                          if (confirm(`Excluir projeto "${project.title}"?`)) {
-                            await supabase.from('projects').delete().eq('id', project.id);
-                            window.location.reload();
-                          }
-                        }}
+                        onClick={() => setToDelete([project.id])}
                         className="size-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-500/10 transition-colors"
                         title="Excluir"
                       >
@@ -205,7 +244,7 @@ const Projects: React.FC = () => {
               ))}
               {projects.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
                     <span className="material-symbols-outlined text-3xl mb-2 block opacity-50">folder_off</span>
                     Nenhum projeto encontrado.
                   </td>
@@ -339,6 +378,31 @@ const Projects: React.FC = () => {
           </div>
         </div>
       )}
+
+      {toDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => !deleting && setToDelete(null)}>
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/10 shadow-2xl p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <span className="material-symbols-outlined text-red-500">warning</span>
+              {toDelete.length === 1 ? 'Excluir projeto' : `Excluir ${toDelete.length} projetos`}
+            </h3>
+            <p className="text-sm text-slate-600 dark:text-slate-300 mt-3">
+              {toDelete.length === 1
+                ? `Vai excluir o projeto "${projects.find(p => p.id === toDelete[0])?.title || ''}"`
+                : `Vai excluir ${toDelete.length} projetos`}{' '}
+              e todas as demandas, horas e valores ligados a eles (isso muda Kanban e Finanças). Não dá para desfazer.
+            </p>
+            {deleteError && <p className="text-sm text-red-500 mt-3">{deleteError}</p>}
+            <div className="flex justify-end gap-2 mt-6">
+              <button onClick={() => setToDelete(null)} disabled={deleting} className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5">Cancelar</button>
+              <button onClick={confirmDelete} disabled={deleting} className="px-4 py-2 rounded-xl text-sm font-bold bg-red-500 text-white hover:bg-red-600 disabled:opacity-60">
+                {deleting ? 'Excluindo…' : 'Excluir definitivamente'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { ProjectDemand, Project } from '../types';
+import { useClients } from '../hooks/useClients';
+import { useNotasFiscais } from '../hooks/useNotasFiscais';
+
 
 const Finances: React.FC = () => {
   const [demands, setDemands] = useState<ProjectDemand[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const { clients } = useClients();
+  const { invoices } = useNotasFiscais();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -13,7 +18,7 @@ const Finances: React.FC = () => {
 
       const [demandsRes, projectsRes] = await Promise.all([
         supabase.from('project_demands').select('*').order('created_at', { ascending: false }),
-        supabase.from('projects').select('id, title').order('created_at', { ascending: false })
+        supabase.from('projects').select('id, title, client_id').order('created_at', { ascending: false })
       ]);
 
       if (demandsRes.data) {
@@ -39,6 +44,7 @@ const Finances: React.FC = () => {
         setProjects(projectsRes.data.map((row: any) => ({
           id: row.id,
           title: row.title,
+          clientId: row.client_id || undefined,
           client: '',
           priority: 'Média' as const,
           status: 'A Fazer' as const,
@@ -58,6 +64,29 @@ const Finances: React.FC = () => {
   const pendingPayments = demands.filter(d => d.paymentStatus === 'Pendente').reduce((acc, curr) => acc + curr.amount, 0);
   const pendingCount = demands.filter(d => d.paymentStatus === 'Pendente').length;
   const completedPayments = demands.filter(d => d.paymentStatus === 'Pago').reduce((acc, curr) => acc + curr.amount, 0);
+
+  // ---- Cruzamento: demandas (por projeto→cliente) × notas fiscais emitidas (por cliente) ----
+  const brl = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
+  const activeInvoices = invoices.filter(i => i.status !== 'cancelada');
+  const currentYear = String(new Date().getFullYear());
+  const nfYearTotal = activeInvoices.filter(i => i.issueDate?.startsWith(currentYear)).reduce((a, i) => a + (i.amount || 0), 0);
+  const nfAllTotal = activeInvoices.reduce((a, i) => a + (i.amount || 0), 0);
+  const nfUnlinked = activeInvoices.filter(i => !i.clientId);
+
+  const clientRows = clients.map(c => {
+    const projIds = projects.filter(p => p.clientId === c.id).map(p => p.id);
+    const cd = demands.filter(d => projIds.includes(d.projectId));
+    const nfs = activeInvoices.filter(i => i.clientId === c.id);
+    return {
+      id: c.id,
+      name: c.company || c.name,
+      demandsTotal: cd.reduce((a, d) => a + d.amount, 0),
+      paid: cd.filter(d => d.paymentStatus === 'Pago').reduce((a, d) => a + d.amount, 0),
+      pending: cd.filter(d => d.paymentStatus !== 'Pago').reduce((a, d) => a + d.amount, 0),
+      nfTotal: nfs.reduce((a, i) => a + (i.amount || 0), 0),
+      nfCount: nfs.length,
+    };
+  }).filter(r => r.demandsTotal > 0 || r.nfCount > 0);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -164,6 +193,61 @@ const Finances: React.FC = () => {
           <p className="text-xs font-medium text-slate-400 mt-3 flex items-center gap-1.5 relative">
             <span className="size-1.5 rounded-full bg-emerald-500"></span> Valor em caixa
           </p>
+        </div>
+      </div>
+
+      {/* Notas fiscais × clientes */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white dark:bg-surface-dark p-6 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm">
+          <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Notas emitidas em {currentYear}</p>
+          <h3 className="text-2xl font-black mt-1 text-slate-900 dark:text-white tracking-tight">{brl(nfYearTotal)}</h3>
+        </div>
+        <div className="bg-white dark:bg-surface-dark p-6 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm">
+          <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Total de notas emitidas (todos os anos)</p>
+          <h3 className="text-2xl font-black mt-1 text-slate-900 dark:text-white tracking-tight">{brl(nfAllTotal)}</h3>
+          <p className="text-xs text-slate-400 mt-2">{activeInvoices.length} nota(s)</p>
+        </div>
+        <div className="bg-white dark:bg-surface-dark p-6 rounded-2xl border border-amber-500/20 shadow-sm">
+          <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Notas sem cliente vinculado</p>
+          <h3 className="text-2xl font-black mt-1 text-amber-500 tracking-tight">{brl(nfUnlinked.reduce((a, i) => a + (i.amount || 0), 0))}</h3>
+          <p className="text-xs text-slate-400 mt-2">{nfUnlinked.length} nota(s) · vincule em Notas Fiscais › Cruzar com clientes</p>
+        </div>
+      </div>
+
+      {/* Resumo por cliente */}
+      <div className="bg-white dark:bg-surface-dark rounded-2xl border border-slate-200 dark:border-white/5 overflow-hidden shadow-sm">
+        <div className="px-6 py-5 border-b border-slate-200 dark:border-white/5 flex items-center justify-between bg-slate-50/50 dark:bg-black/10">
+          <h3 className="font-bold text-slate-900 dark:text-white text-lg">Resumo por cliente</h3>
+          <span className="text-xs text-slate-500">Demandas dos projetos × notas fiscais emitidas</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse whitespace-nowrap">
+            <thead>
+              <tr className="bg-slate-50/80 dark:bg-surface-dark border-b border-slate-200 dark:border-white/5 text-xs font-bold uppercase text-slate-500 tracking-wider">
+                <th className="px-6 py-4">Cliente</th>
+                <th className="px-6 py-4 text-right">Demandas</th>
+                <th className="px-6 py-4 text-right">Pago</th>
+                <th className="px-6 py-4 text-right">Pendente</th>
+                <th className="px-6 py-4 text-right">Notas emitidas</th>
+                <th className="px-6 py-4 text-right">Nº de notas</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+              {clientRows.map(r => (
+                <tr key={r.id} className="hover:bg-slate-50/80 dark:hover:bg-white/[0.02] transition-colors">
+                  <td className="px-6 py-4 text-sm font-bold text-slate-900 dark:text-slate-200">{r.name}</td>
+                  <td className="px-6 py-4 text-right text-sm font-medium text-slate-700 dark:text-slate-300">{brl(r.demandsTotal)}</td>
+                  <td className="px-6 py-4 text-right text-sm font-medium text-emerald-500">{brl(r.paid)}</td>
+                  <td className="px-6 py-4 text-right text-sm font-medium text-amber-500">{brl(r.pending)}</td>
+                  <td className="px-6 py-4 text-right text-sm font-black text-slate-900 dark:text-white">{brl(r.nfTotal)}</td>
+                  <td className="px-6 py-4 text-right text-sm text-slate-500">{r.nfCount}</td>
+                </tr>
+              ))}
+              {clientRows.length === 0 && (
+                <tr><td colSpan={6} className="px-6 py-10 text-center text-sm text-slate-500">Nenhum cliente com demandas ou notas ainda.</td></tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
