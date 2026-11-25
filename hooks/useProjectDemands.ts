@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { deleteDemandsCascade } from '../lib/cascadeDelete';
 import { ProjectDemand, SubDemand, PriceItemType } from '../types';
 
 function mapSubDemand(row: any): SubDemand {
@@ -216,7 +217,7 @@ export function useProjectDemands(projectId?: string) {
     }, []);
 
     const deleteDemands = async (ids: string[]): Promise<boolean> => {
-        const { error } = await supabase.from('project_demands').delete().in('id', ids);
+        const error = await deleteDemandsCascade(ids);
         if (error) {
             console.error('Erro ao excluir demandas:', error);
             return false;

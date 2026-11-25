@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useProjects } from '../hooks/useProjects';
 import { useClients } from '../hooks/useClients';
 import { supabase } from '../lib/supabaseClient';
+import { deleteProjectsCascade } from '../lib/cascadeDelete';
 import { Project } from '../types';
 
 const Projects: React.FC = () => {
@@ -23,10 +24,10 @@ const Projects: React.FC = () => {
     if (!toDelete) return;
     setDeleting(true);
     setDeleteError('');
-    const { error } = await supabase.from('projects').delete().in('id', toDelete);
+    const error = await deleteProjectsCascade(toDelete);
     setDeleting(false);
     if (error) {
-      setDeleteError(`Não consegui excluir: ${error.message}`);
+      setDeleteError(`Não consegui excluir: ${error}`);
       return;
     }
     setSelected(prev => prev.filter(id => !toDelete.includes(id)));

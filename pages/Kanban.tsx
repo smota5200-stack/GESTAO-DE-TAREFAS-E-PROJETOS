@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { deleteDemandsCascade } from '../lib/cascadeDelete';
 
 type KanbanStatus = 'Novos ou parados' | 'Em andamento' | 'Aguardando informações' | 'Aguardando aprovação' | 'Concluído';
 
@@ -118,10 +119,10 @@ const Kanban: React.FC = () => {
     if (!toDelete) return;
     setDeleting(true);
     setDeleteError('');
-    const { error } = await supabase.from('project_demands').delete().in('id', toDelete.ids);
+    const error = await deleteDemandsCascade(toDelete.ids);
     setDeleting(false);
     if (error) {
-      setDeleteError(`Não consegui excluir: ${error.message}`);
+      setDeleteError(`Não consegui excluir: ${error}`);
       return;
     }
     const saved = JSON.parse(localStorage.getItem('kanban_states') || '{}');

@@ -114,8 +114,8 @@ const Clients: React.FC = () => {
 
   const handleCreateClient = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newClientForm.name || !newClientForm.company || !newClientForm.email) {
-      alert('Por favor, preencha Nome, Empresa e E-mail.');
+    if (!newClientForm.name || !newClientForm.company) {
+      alert('Por favor, preencha Nome e Empresa.');
       return;
     }
 
@@ -327,10 +327,9 @@ const Clients: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">E-mail *</label>
+                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">E-mail</label>
                   <input
                     type="email"
-                    required
                     value={newClientForm.email}
                     onChange={e => setNewClientForm({ ...newClientForm, email: e.target.value })}
                     className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/50 outline-none transition-all placeholder:text-slate-400"
