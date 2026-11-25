@@ -3,6 +3,7 @@ import { useClients } from '../hooks/useClients';
 import { usePriceTable } from '../hooks/usePriceTable';
 import { useBudgets } from '../hooks/useBudgets';
 import { ActionToolbar, Toast, useToast } from '../components/ActionToolbar';
+import Mockup3D from '../components/Mockup3D';
 import { elementToPdf, saveToDrive } from '../lib/driveFolder';
 
 interface LineItem {
@@ -542,6 +543,8 @@ const Orcamentos: React.FC = () => {
               </div>
             )}
           </Section>
+
+          <Mockup3D items={draft.items} />
 
           <Section step={3} title="Condições" subtitle="Validade, prazo, pagamento e valores">
             <div className="grid grid-cols-2 gap-4">
