@@ -33,6 +33,7 @@ const App: React.FC = () => {
           <Route path="projetos/:id" element={<ProjectDetails />} />
           <Route path="orcamentos" element={<Orcamentos />} />
           <Route path="orcamento-foggiatto" element={<OrcamentoFoggiatto />} />
+          <Route path="orcamento-foggiatto-v1" element={<OrcamentoFoggiatto versao="v1" />} />
           <Route path="relatorios" element={<Reports />} />
           <Route path="precos" element={<PriceTable />} />
           <Route path="financas" element={<Finances />} />
