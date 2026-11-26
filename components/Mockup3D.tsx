@@ -2,13 +2,13 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 type Piece = 'bone' | 'camiseta' | 'polo';
 
-const PIECES: { id: Piece; label: string; match: RegExp; depth: number }[] = [
+export const PIECES: { id: Piece; label: string; match: RegExp; depth: number }[] = [
   { id: 'bone', label: 'Boné', match: /bon[eé]/i, depth: 46 },
   { id: 'camiseta', label: 'Camiseta', match: /camiseta|camisa(?!\s*polo)/i, depth: 22 },
   { id: 'polo', label: 'Polo', match: /polo/i, depth: 22 },
 ];
 
-const FILES: Record<Piece, { navy: string; cinza: string }> = {
+export const FILES: Record<Piece, { navy: string; cinza: string }> = {
   bone: { navy: '/mockups/bone_navy.webp', cinza: '/mockups/bone_cinza.webp' },
   camiseta: { navy: '/mockups/cam_navy.webp', cinza: '/mockups/cam_cinza.webp' },
   polo: { navy: '/mockups/polo_navy.webp', cinza: '/mockups/polo_cinza.webp' },
@@ -106,6 +106,9 @@ const Spin: React.FC<{ src: string; depth: number; label: string }> = ({ src, de
     </div>
   );
 };
+
+export const detectPieces = (items: { description: string }[]) =>
+  PIECES.filter(p => items.some(i => p.match.test(i.description || '')));
 
 interface Props {
   items: { description: string }[];

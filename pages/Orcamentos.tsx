@@ -3,7 +3,7 @@ import { useClients } from '../hooks/useClients';
 import { usePriceTable } from '../hooks/usePriceTable';
 import { useBudgets } from '../hooks/useBudgets';
 import { ActionToolbar, Toast, useToast } from '../components/ActionToolbar';
-import Mockup3D from '../components/Mockup3D';
+import Mockup3D, { detectPieces, FILES as MOCK_FILES } from '../components/Mockup3D';
 import { elementToPdf, saveToDrive, PDF_H2C } from '../lib/driveFolder';
 
 interface LineItem {
@@ -29,6 +29,8 @@ interface Draft {
   observations: string;
   discount: number;
   items: LineItem[];
+  includeMockups?: boolean;
+  artes?: string[];
   savedId?: string;
 }
 
@@ -60,6 +62,8 @@ const emptyDraft = (): Draft => ({
   observations: '',
   discount: 0,
   items: [],
+  includeMockups: true,
+  artes: [],
 });
 
 const loadDraft = (): Draft => {
@@ -196,6 +200,28 @@ const Orcamentos: React.FC = () => {
   const filteredPriceItems = priceItems
     .filter(p => p.title.toLowerCase().includes(pickerSearch.toLowerCase()))
     .slice(0, 40);
+
+  const addArtes = async (files: FileList | null) => {
+    if (!files) return;
+    const out: string[] = [];
+    for (const f of Array.from(files)) {
+      if (!f.type.startsWith('image/')) continue;
+      const url = URL.createObjectURL(f);
+      try {
+        const img = await new Promise<HTMLImageElement>((ok, err) => { const i = new Image(); i.onload = () => ok(i); i.onerror = err; i.src = url; });
+        const k = Math.min(1, 1000 / Math.max(img.naturalWidth, img.naturalHeight));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+        c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
+        out.push(c.toDataURL('image/png'));
+      } finally { URL.revokeObjectURL(url); }
+    }
+    if (out.length) setDraft(d => ({ ...d, artes: [...(d.artes || []), ...out] }));
+  };
+
+  const mockPieces = detectPieces(draft.items);
+  const artesList = draft.artes || [];
+  const showMockPage = draft.includeMockups !== false && (mockPieces.length > 0 || artesList.length > 0);
 
   const newProposal = () => {
     if ((draft.items.length || draft.company) && !confirm('Limpar o formulário e começar um novo orçamento?')) return;
@@ -394,6 +420,49 @@ const Orcamentos: React.FC = () => {
           <span>{draft.ref}</span>
         </div>
       </div>
+
+      {/* Página extra: artes e peças */}
+      {showMockPage && (
+        <>
+          <div className="html2pdf__page-break" />
+          <div className="px-14 pt-12 pb-10" style={{ minHeight: A4_HEIGHT }}>
+            <div className="h-1 w-16 mb-6" style={{ background: '#bcd200' }} />
+            <h2 className="text-[22px] font-bold text-slate-900 mb-1">Artes e peças</h2>
+            <p className="text-[12px] text-slate-500 mb-8">Apresentação das peças e das artes da proposta {draft.ref}. Imagens ilustrativas.</p>
+
+            {mockPieces.map(p => (
+              <div key={p.id} className="mb-8 avoid-break">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400 mb-3">{p.label}</p>
+                <div className="grid grid-cols-2 gap-4">
+                  {([['navy', 'Azul-marinho'], ['cinza', 'Cinza-chumbo']] as const).map(([k, nome]) => (
+                    <div key={k} className="rounded-xl border border-slate-200 overflow-hidden" style={{ background: 'radial-gradient(ellipse at 50% 40%, #ffffff 0%, #eef0f5 60%, #dfe3ec 100%)' }}>
+                      <div className="flex items-center justify-center" style={{ height: 230 }}>
+                        <img src={MOCK_FILES[p.id][k]} alt={`${p.label} ${nome}`} style={{ maxHeight: 210, maxWidth: '90%', width: 'auto', height: 'auto' }} />
+                      </div>
+                      <p className="px-3 py-2 text-[11px] font-semibold text-slate-600 border-t border-slate-200 bg-white">{p.label} · {nome}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {artesList.length > 0 && (
+              <div className="avoid-break">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400 mb-3">Artes</p>
+                <div className="grid grid-cols-2 gap-4">
+                  {artesList.map((a, i) => (
+                    <div key={i} className="rounded-xl border border-slate-200 bg-white flex items-center justify-center p-3" style={{ height: 200 }}>
+                      <img src={a} alt={`Arte ${i + 1}`} style={{ maxHeight: 176, maxWidth: '100%', width: 'auto', height: 'auto' }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <p className="text-[10px] text-slate-400 mt-8">Cores e posicionamento finais conforme aprovação da arte. Visualização 3D interativa disponível no sistema.</p>
+          </div>
+        </>
+      )}
     </div>
   );
 
@@ -545,6 +614,29 @@ const Orcamentos: React.FC = () => {
           </Section>
 
           <Mockup3D items={draft.items} />
+
+          <div className="rounded-2xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-white/5 p-5">
+            <h2 className="text-[15px] font-bold text-slate-900 dark:text-white leading-7">Artes e peças no PDF</h2>
+            <p className="text-xs text-slate-500 mb-3">Adiciona uma página ao PDF com as peças (boné, camiseta, polo) e as artes enviadas.</p>
+            <label className="flex items-center gap-2 text-sm mb-3 cursor-pointer">
+              <input type="checkbox" checked={draft.includeMockups !== false} onChange={e => set('includeMockups', e.target.checked)} />
+              Incluir página de artes e peças no PDF
+            </label>
+            <label className="inline-flex h-10 px-4 text-sm font-bold text-slate-900 bg-primary rounded-xl items-center gap-2 cursor-pointer">
+              <span className="material-symbols-outlined text-[18px]">upload</span> Anexar artes (PNG/JPG)
+              <input type="file" accept="image/*" multiple className="hidden" onChange={e => { addArtes(e.target.files); e.target.value = ''; }} />
+            </label>
+            {artesList.length > 0 && (
+              <div className="grid grid-cols-4 gap-2 mt-3">
+                {artesList.map((a, i) => (
+                  <div key={i} className="relative group rounded-lg border border-slate-200 dark:border-white/10 bg-white p-1 h-20 flex items-center justify-center">
+                    <img src={a} alt="" className="max-h-full max-w-full object-contain" />
+                    <button onClick={() => set('artes', artesList.filter((_, k) => k !== i))} className="absolute -top-2 -right-2 size-5 rounded-full bg-red-500 text-white text-xs hidden group-hover:flex items-center justify-center">×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           <Section step={3} title="Condições" subtitle="Validade, prazo, pagamento e valores">
             <div className="grid grid-cols-2 gap-4">
