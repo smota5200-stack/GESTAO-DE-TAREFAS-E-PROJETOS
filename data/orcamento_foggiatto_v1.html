@@ -78,6 +78,11 @@
   .medidas td:first-child{font-weight:700}
   @media (max-width:700px){.spin-grid{grid-template-columns:1fr}}
   @media print{.spin{height:300px;perspective:none}.spin .obj img.mid,.spin .floor{display:none}.spin .obj img{transform:none!important}}
+
+  .ic-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:8px 0 16px}
+  .ic-grid label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:#5a6479;font-weight:600}
+  .ic-grid input{padding:7px 8px;border:1px solid #d5dbe8;border-radius:8px;font-size:14px;color:#0f1f4a}
+  @media print{.interno{display:none!important}}
   .gallery{align-items:start}
   .card figcaption{padding:10px 14px;font-size:13px;display:flex;justify-content:space-between;gap:8px;background:#fff;border-top:1px solid var(--line)}
   .card figcaption b{color:var(--navy)}
@@ -198,6 +203,21 @@
 </section>
 
 <section>
+  <h2>Aplicação e medidas da arte (DTF têxtil)</h2>
+  <table class="vals">
+    <thead><tr><th>Peça / posição</th><th class="r">Arte (L × A)</th><th>Posicionamento</th></tr></thead>
+    <tbody>
+      <tr><td><b>Camiseta · frente</b></td><td class="r">24,0 × 18,7 cm</td><td>Centralizada, 7 cm abaixo da gola</td></tr>
+      <tr><td><b>Camiseta · costas</b></td><td class="r">28,0 × 21,8 cm</td><td>Centralizada, 10 cm abaixo da gola</td></tr>
+      <tr><td><b>Boné · frente</b></td><td class="r">10,0 × 7,8 cm</td><td>Centro do painel frontal, 1,2 cm acima da aba</td></tr>
+      <tr><td><b>Boné · traseira</b></td><td class="r">6,0 × 4,7 cm</td><td>Centralizada, 1 cm acima do regulador</td></tr>
+      <tr><td><b>Polo · peito</b></td><td class="r">10,0 × 7,8 cm</td><td>Lado esquerdo, na altura da base da gola</td></tr>
+    </tbody>
+  </table>
+  <p class="note">Mesma arte para todos os tamanhos (P ao GG). Proporção da logo preservada.</p>
+</section>
+
+<section>
   <h2>Material de aplicação</h2>
   <div class="dtf">
     <div><h3>DTF Têxtil</h3><p>Impressão digital em filme transferida a quente para o tecido, com cores vivas e detalhes nítidos.</p></div>
@@ -232,6 +252,30 @@
       <tr class="totals-split"><td colspan="3">Entrada (50%) na aprovação do pedido</td><td class="r" id="entrada">R$ 0,00</td></tr>
       <tr class="totals-split"><td colspan="3">Restante (50%) na entrega</td><td class="r" id="resto">R$ 0,00</td></tr></tfoot>
   </table>
+</section>
+
+<section class="interno" id="interno" style="display:none">
+  <h2>Calculadora interna de DTF <span style="font-size:12px;color:#c0392b;font-weight:600">(uso interno · não aparece na impressão)</span></h2>
+  <div class="ic-grid">
+    <label>Metro do DTF (R$)<input id="c_metro" type="number" step="0.01" value="48.80"></label>
+    <label>Largura da bobina (cm)<input id="c_larg" type="number" value="30"></label>
+    <label>Comprimento do metro (cm)<input id="c_comp" type="number" value="100"></label>
+    <label>Folga entre artes (cm)<input id="c_folga" type="number" step="0.1" value="1"></label>
+    <label>Valor da hora (R$)<input id="c_hora" type="number" step="0.01" value="40"></label>
+    <label>Insumos (% do filme)<input id="c_ins" type="number" value="25"></label>
+    <label>Perda (%)<input id="c_perda" type="number" value="10"></label>
+    <label>Margem (%)<input id="c_marg" type="number" value="40"></label>
+    <label>Min. camiseta (f+c)<input id="c_mcam" type="number" value="4"></label>
+    <label>Min. boné (f+t)<input id="c_mbon" type="number" value="6"></label>
+    <label>Min. polo<input id="c_mpol" type="number" value="2"></label>
+    <label>Sangria da faca (cm)<input id="c_sang" type="number" step="0.1" value="0.6"></label>
+  </div>
+  <table class="vals" id="ic_tab">
+    <thead><tr><th>Produto</th><th class="r">Filme</th><th class="r">Insumos</th><th class="r">Mão de obra</th><th class="r">Custo + perda</th><th class="r">DTF sugerido</th><th class="r">Hoje</th><th class="r">Com DTF sugerido</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <p class="note">Filme calculado pela faixa da bobina (artes encaixadas lado a lado quando cabem). Preço = custo com perda ÷ (1 − margem). Valor da peça sem DTF não muda.</p>
+  <button id="ic_apply" type="button" style="margin-top:10px;padding:10px 16px;border:0;border-radius:8px;background:#0f1f4a;color:#fff;font-weight:700;cursor:pointer">Aplicar preços sugeridos ao orçamento</button>
 </section>
 
 <section>
@@ -335,6 +379,50 @@
       paint(); requestAnimationFrame(tick);
     }
     if(probe.complete) build(); else probe.onload=build;
+  });
+})();
+</script>
+<script>
+(function(){
+  var fmt=new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
+  var $=function(id){return parseFloat(document.getElementById(id).value)||0};
+  if(location.hash==='#interno'){document.getElementById('interno').style.display='block'}
+  window.addEventListener('hashchange',function(){document.getElementById('interno').style.display=(location.hash==='#interno')?'block':'none'});
+  var SEM={Polo:33.99,'Camiseta':22.50,'Boné':31.90}, HOJE={Polo:34.00,'Camiseta':27.00,'Boné':10.00};
+  var sug={};
+  function film(arts){ // arts: [{w,h}] (já com sangria)
+    var W=$('c_larg'), cm2=$('c_metro')/($('c_larg')*$('c_comp')), g=$('c_folga'), tot=0;
+    arts.forEach(function(a){var n=Math.max(1,Math.floor(W/(a.w+g)));tot+=((a.h+g)/n)*W*cm2});
+    return tot;
+  }
+  function calc(){
+    var s=$('c_sang'), perda=1+$('c_perda')/100, marg=$('c_marg')/100, hora=$('c_hora'), ins=$('c_ins')/100;
+    var prods=[
+      {n:'Polo',min:$('c_mpol'),arts:[{w:10+s,h:7.8+s}]},
+      {n:'Camiseta',min:$('c_mcam'),arts:[{w:24+s,h:18.7+s},{w:28+s,h:21.8+s}]},
+      {n:'Boné',min:$('c_mbon'),arts:[{w:10+s,h:7.8+s},{w:6+s,h:4.7+s}]}
+    ];
+    var tb=document.querySelector('#ic_tab tbody'); tb.innerHTML='';
+    prods.forEach(function(p){
+      var f=film(p.arts), i=f*ins, mo=p.min/60*hora, custo=(f+i+mo)*perda, preco=marg<1?custo/(1-marg):custo;
+      preco=Math.ceil(preco*10)/10; sug[p.n]=preco;
+      var tr=document.createElement('tr');
+      tr.innerHTML='<td><b>'+p.n+'</b></td><td class="r">'+fmt.format(f)+'</td><td class="r">'+fmt.format(i)+'</td><td class="r">'+fmt.format(mo)+'</td><td class="r">'+fmt.format(custo)+'</td><td class="r price">'+fmt.format(preco)+'</td><td class="r">'+fmt.format(HOJE[p.n])+'</td><td class="r price">'+fmt.format(SEM[p.n]+preco)+'</td>';
+      tb.appendChild(tr);
+    });
+  }
+  document.querySelectorAll('#interno input').forEach(function(el){el.addEventListener('input',calc)});
+  calc();
+  document.getElementById('ic_apply').addEventListener('click',function(){
+    var names=['Polo','Camiseta','Boné'];
+    document.querySelectorAll('#sim tbody tr').forEach(function(tr,idx){tr.dataset.com=(SEM[names[idx]]+sug[names[idx]]).toFixed(2)});
+    var t=[].slice.call(document.querySelectorAll('table')).find(function(t){return /Sem DTF/i.test(t.textContent)&&/Diferen/i.test(t.textContent)&&t.id!=='ic_tab'});
+    if(t){[].slice.call(t.querySelectorAll('tbody tr')).forEach(function(tr,idx){
+      var nm=names[idx]; if(!nm) return; var c=tr.querySelectorAll('td');
+      if(c.length>=4){c[2].textContent=fmt.format(SEM[nm]+sug[nm]);c[3].textContent='+ '+fmt.format(sug[nm]);}
+    });}
+    document.querySelectorAll('#sim input')[0].dispatchEvent(new Event('input',{bubbles:true}));
+    alert('Preços sugeridos aplicados ao orçamento (válido até recarregar a página).');
   });
 })();
 </script>
