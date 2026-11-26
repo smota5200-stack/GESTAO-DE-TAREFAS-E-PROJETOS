@@ -269,12 +269,16 @@
     <label>Min. boné (f+t)<input id="c_mbon" type="number" value="6"></label>
     <label>Min. polo<input id="c_mpol" type="number" value="2"></label>
     <label>Sangria da faca (cm)<input id="c_sang" type="number" step="0.1" value="0.6"></label>
+    <label>Frete / busca da compra na Bresser (R$)<input id="c_fcomp" type="number" step="0.01" value="30"></label>
+    <label>Metros por compra na Bresser<input id="c_mcomp" type="number" step="0.1" value="10"></label>
+    <label>Frete / entrega ao cliente (R$ por pedido)<input id="c_fent" type="number" step="0.01" value="40"></label>
+    <label>Peças por pedido (rateio da entrega)<input id="c_pped" type="number" value="50"></label>
   </div>
   <table class="vals" id="ic_tab">
-    <thead><tr><th>Produto</th><th class="r">Filme</th><th class="r">Insumos</th><th class="r">Mão de obra</th><th class="r">Custo + perda</th><th class="r">DTF sugerido</th><th class="r">Hoje</th><th class="r">Com DTF sugerido</th></tr></thead>
+    <thead><tr><th>Produto</th><th class="r">Filme</th><th class="r">Insumos</th><th class="r">Mão de obra</th><th class="r">Entrega/peça</th><th class="r">Custo + perda</th><th class="r">DTF sugerido</th><th class="r">Hoje</th><th class="r">Com DTF sugerido</th></tr></thead>
     <tbody></tbody>
   </table>
-  <p class="note">Filme calculado pela faixa da bobina (artes encaixadas lado a lado quando cabem). Preço = custo com perda ÷ (1 − margem). Valor da peça sem DTF não muda.</p>
+  <p class="note">Metro efetivo = metro + frete/busca ÷ metros por compra (valores de frete são estimativas: ajuste). Entrega ao cliente rateada por peça. Filme calculado pela faixa da bobina (artes encaixadas lado a lado quando cabem). Preço = custo com perda ÷ (1 − margem). Valor da peça sem DTF não muda.</p>
   <button id="ic_apply" type="button" style="margin-top:10px;padding:10px 16px;border:0;border-radius:8px;background:#0f1f4a;color:#fff;font-weight:700;cursor:pointer">Aplicar preços sugeridos ao orçamento</button>
 </section>
 
@@ -390,8 +394,9 @@
   window.addEventListener('hashchange',function(){document.getElementById('interno').style.display=(location.hash==='#interno')?'block':'none'});
   var SEM={Polo:33.99,'Camiseta':22.50,'Boné':31.90}, HOJE={Polo:34.00,'Camiseta':27.00,'Boné':10.00};
   var sug={};
+  function metroEf(){var m=$('c_mcomp');return $('c_metro')+(m>0?$('c_fcomp')/m:0)}
   function film(arts){ // arts: [{w,h}] (já com sangria)
-    var W=$('c_larg'), cm2=$('c_metro')/($('c_larg')*$('c_comp')), g=$('c_folga'), tot=0;
+    var W=$('c_larg'), cm2=metroEf()/($('c_larg')*$('c_comp')), g=$('c_folga'), tot=0;
     arts.forEach(function(a){var n=Math.max(1,Math.floor(W/(a.w+g)));tot+=((a.h+g)/n)*W*cm2});
     return tot;
   }
@@ -404,10 +409,10 @@
     ];
     var tb=document.querySelector('#ic_tab tbody'); tb.innerHTML='';
     prods.forEach(function(p){
-      var f=film(p.arts), i=f*ins, mo=p.min/60*hora, custo=(f+i+mo)*perda, preco=marg<1?custo/(1-marg):custo;
+      var f=film(p.arts), i=f*ins, mo=p.min/60*hora, fr=$('c_pped')>0?$('c_fent')/$('c_pped'):0, custo=(f+i+mo)*perda+fr, preco=marg<1?custo/(1-marg):custo;
       preco=Math.ceil(preco*10)/10; sug[p.n]=preco;
       var tr=document.createElement('tr');
-      tr.innerHTML='<td><b>'+p.n+'</b></td><td class="r">'+fmt.format(f)+'</td><td class="r">'+fmt.format(i)+'</td><td class="r">'+fmt.format(mo)+'</td><td class="r">'+fmt.format(custo)+'</td><td class="r price">'+fmt.format(preco)+'</td><td class="r">'+fmt.format(HOJE[p.n])+'</td><td class="r price">'+fmt.format(SEM[p.n]+preco)+'</td>';
+      tr.innerHTML='<td><b>'+p.n+'</b></td><td class="r">'+fmt.format(f)+'</td><td class="r">'+fmt.format(i)+'</td><td class="r">'+fmt.format(mo)+'</td><td class="r">'+fmt.format(fr)+'</td><td class="r">'+fmt.format(custo)+'</td><td class="r price">'+fmt.format(preco)+'</td><td class="r">'+fmt.format(HOJE[p.n])+'</td><td class="r price">'+fmt.format(SEM[p.n]+preco)+'</td>';
       tb.appendChild(tr);
     });
   }
