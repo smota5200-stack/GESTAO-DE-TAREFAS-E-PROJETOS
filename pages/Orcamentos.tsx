@@ -4,7 +4,7 @@ import { usePriceTable } from '../hooks/usePriceTable';
 import { useBudgets } from '../hooks/useBudgets';
 import { ActionToolbar, Toast, useToast } from '../components/ActionToolbar';
 import Mockup3D from '../components/Mockup3D';
-import { elementToPdf, saveToDrive } from '../lib/driveFolder';
+import { elementToPdf, saveToDrive, PDF_H2C } from '../lib/driveFolder';
 
 interface LineItem {
   id: string;
@@ -254,7 +254,7 @@ const Orcamentos: React.FC = () => {
           margin: 0,
           filename: `${fileBase()}.pdf`,
           image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, logging: false },
+          html2canvas: PDF_H2C,
           jsPDF: { unit: 'px', format: [A4_WIDTH, A4_HEIGHT], orientation: 'portrait', hotfixes: ['px_scaling'] },
           pagebreak: { mode: ['css', 'legacy'], avoid: ['tr', '.avoid-break'] },
         })
